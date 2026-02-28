@@ -124,7 +124,7 @@ mod tests {
         assert_eq!(probs.len(), logits.len());
         let sum: f64 = probs.iter().sum();
         assert!((sum - 1.0).abs() < 1e-6);
-        assert!(probs.iter().all(|&p| p >= 0.0 && p <= 1.0));
+        assert!(probs.iter().all(|&p| (0.0..=1.0).contains(&p)));
     }
 
     #[test]
@@ -134,7 +134,7 @@ mod tests {
         let mask = relaxed_topk_gumbel(&scores, 3, 0.5, 1.0, &mut rng);
 
         assert_eq!(mask.len(), scores.len());
-        assert!(mask.iter().all(|&m| m >= 0.0 && m <= 1.0));
+        assert!(mask.iter().all(|&m| (0.0..=1.0).contains(&m)));
     }
 
     #[test]

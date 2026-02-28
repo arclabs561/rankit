@@ -36,7 +36,7 @@ proptest! {
     #[test]
     fn sigmoid_bounded(x in -1000.0..1000.0_f64) {
         let s = crate::rank::sigmoid(x);
-        prop_assert!(s >= 0.0 && s <= 1.0, "sigmoid({}) = {} out of [0,1]", x, s);
+        prop_assert!((0.0..=1.0).contains(&s), "sigmoid({}) = {} out of [0,1]", x, s);
     }
 
     #[test]

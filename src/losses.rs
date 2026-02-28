@@ -365,6 +365,6 @@ mod tests {
         let predictions = vec![0.8, 0.3, 0.6];
         let relevance = vec![2.0, 0.0, 1.0];
         let ndcg = approx_ndcg(&predictions, &relevance, 1.0, None);
-        assert!(ndcg >= 0.0 && ndcg <= 1.0);
+        assert!((0.0..=1.0).contains(&ndcg));
     }
 }
