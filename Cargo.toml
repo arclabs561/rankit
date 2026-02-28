@@ -1,0 +1,52 @@
+[package]
+name = "rankit"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.74"
+license = "MIT OR Apache-2.0"
+authors = ["Arc <attobop@gmail.com>"]
+description = "Learning to Rank: differentiable ranking, LTR losses (RankNet, LambdaRank, ApproxNDCG, ListNet, ListMLE), trainers, and IR evaluation metrics"
+homepage = "https://github.com/arclabs561/rankit"
+repository = "https://github.com/arclabs561/rankit"
+documentation = "https://docs.rs/rankit"
+keywords = ["learning-to-rank", "ranking", "ndcg", "lambdarank", "information-retrieval"]
+categories = ["algorithms", "science", "mathematics"]
+
+[features]
+default = ["eval", "losses"]
+
+# IR evaluation metrics (TREC, NDCG, MAP, MRR, precision, recall, batch eval, statistics)
+eval = ["dep:anyhow"]
+
+# LTR loss functions (RankNet, LambdaLoss, ApproxNDCG, ListNet, ListMLE)
+losses = []
+
+# Gumbel-Softmax and relaxed top-k methods
+gumbel = ["dep:rand"]
+
+# Parallel computation with Rayon
+parallel = ["dep:rayon"]
+
+# Serde serialization for eval types
+serde = ["dep:serde", "dep:serde_json"]
+
+[dependencies]
+fynch = "0.1.0"
+thiserror = "2.0"
+
+# Optional
+anyhow = { version = "1.0", optional = true }
+rayon = { version = "1.10", optional = true }
+rand = { version = "0.9", optional = true }
+serde = { version = "1.0", features = ["derive"], optional = true }
+serde_json = { version = "1.0", optional = true }
+
+[dev-dependencies]
+proptest = "1.5"
+approx = "0.5"
+tempfile = "3"
+
+[workspace]
+
+[lints.clippy]
+needless_range_loop = "allow"
