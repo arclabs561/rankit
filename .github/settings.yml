@@ -1,0 +1,21 @@
+# Managed by repository-settings/app
+# https://github.com/repository-settings/app
+
+repository:
+  description: "Learning to Rank: differentiable ranking, LTR losses (RankNet, LambdaRank, ApproxNDCG, ListNet, ListMLE), trainers, and IR evaluation metrics"
+  homepage: "https://docs.rs/rankit"
+  private: false
+  has_issues: true
+  has_wiki: false
+  has_downloads: true
+  default_branch: main
+  allow_squash_merge: true
+  allow_merge_commit: true
+  allow_rebase_merge: true
+  delete_branch_on_merge: true
+
+  topics:
+    - learning-to-rank
+    - information-retrieval
+    - machine-learning
+    - rust
