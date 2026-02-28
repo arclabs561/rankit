@@ -9,7 +9,7 @@ description = "Learning to Rank: differentiable ranking, LTR losses (RankNet, La
 homepage = "https://github.com/arclabs561/rankit"
 repository = "https://github.com/arclabs561/rankit"
 documentation = "https://docs.rs/rankit"
-keywords = ["learning-to-rank", "ranking", "ndcg", "lambdarank", "information-retrieval"]
+keywords = ["learning-to-rank", "ranking", "ndcg", "lambdarank", "ir-eval"]
 categories = ["algorithms", "science", "mathematics"]
 
 [features]
