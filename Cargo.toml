@@ -48,5 +48,9 @@ tempfile = "3"
 
 [workspace]
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [lints.clippy]
 needless_range_loop = "allow"
