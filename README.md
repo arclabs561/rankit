@@ -1,5 +1,9 @@
 # rankit
 
+[![crates.io](https://img.shields.io/crates/v/rankit.svg)](https://crates.io/crates/rankit)
+[![Documentation](https://docs.rs/rankit/badge.svg)](https://docs.rs/rankit)
+[![CI](https://github.com/arclabs561/rankit/actions/workflows/ci.yml/badge.svg)](https://github.com/arclabs561/rankit/actions/workflows/ci.yml)
+
 Learning to Rank for Rust: differentiable ranking, LTR losses, trainers, and IR evaluation metrics.
 
 ## What it does
