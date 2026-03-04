@@ -72,19 +72,18 @@ pub mod eval;
 
 // --- Re-exports: core ---
 
-pub use rank::soft_rank;
+pub use batch::{soft_rank_batch, spearman_loss_batch};
+pub use gradients::{
+    compute_lambdarank_gradients, compute_ranking_svm_gradients, ndcg_at_k, pairwise_hinge_loss,
+    sigmoid_derivative, soft_rank_gradient, spearman_loss_gradient, GradientError,
+    LambdaRankParams, LambdaRankTrainer, RankingSVMParams, RankingSVMTrainer,
+};
 pub use methods::{
-    soft_rank_sigmoid, soft_rank_neural_sort, soft_rank_probabilistic, soft_rank_smooth_i,
+    soft_rank_neural_sort, soft_rank_probabilistic, soft_rank_sigmoid, soft_rank_smooth_i,
     RankingMethod,
 };
-pub use gradients::{
-    soft_rank_gradient, spearman_loss_gradient, sigmoid_derivative,
-    GradientError,
-    LambdaRankParams, LambdaRankTrainer, compute_lambdarank_gradients, ndcg_at_k,
-    RankingSVMParams, RankingSVMTrainer, compute_ranking_svm_gradients, pairwise_hinge_loss,
-};
-pub use batch::{soft_rank_batch, spearman_loss_batch};
-pub use optimized::{soft_rank_optimized, soft_rank_gradient_sparse};
+pub use optimized::{soft_rank_gradient_sparse, soft_rank_optimized};
+pub use rank::soft_rank;
 pub use topk::differentiable_topk;
 
 #[cfg(feature = "parallel")]
@@ -94,14 +93,14 @@ pub use optimized::soft_rank_batch_parallel;
 
 #[cfg(feature = "losses")]
 pub use losses::{
-    ranknet_loss, lambda_loss, approx_ndcg, approx_ndcg_loss,
-    listnet_loss, listmle_loss, soft_rank_softsort,
+    approx_ndcg, approx_ndcg_loss, lambda_loss, listmle_loss, listnet_loss, ranknet_loss,
+    soft_rank_softsort,
 };
 
 // --- Re-exports: gumbel ---
 
 #[cfg(feature = "gumbel")]
-pub use sampling::{gumbel_softmax, relaxed_topk_gumbel, gumbel_attention_mask};
+pub use sampling::{gumbel_attention_mask, gumbel_softmax, relaxed_topk_gumbel};
 
 // --- Re-exports from fynch (primitives layer) ---
 
@@ -111,11 +110,7 @@ pub use fynch::loss::spearman_loss;
 // --- Re-exports: eval ---
 
 #[cfg(feature = "eval")]
-pub use eval::{
-    binary, graded, trec, statistics,
-    batch as eval_batch,
-    export, validation,
-};
+pub use eval::{batch as eval_batch, binary, export, graded, statistics, trec, validation};
 
 #[cfg(test)]
 mod proptests;

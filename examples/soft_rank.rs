@@ -3,7 +3,7 @@
 //! Demonstrates how `soft_rank` produces continuous rank approximations that
 //! converge to discrete ranks as regularization strength increases.
 
-use rankit::{soft_rank, soft_rank_sigmoid, soft_rank_neural_sort, soft_rank_smooth_i};
+use rankit::{soft_rank, soft_rank_neural_sort, soft_rank_sigmoid, soft_rank_smooth_i};
 
 fn main() {
     let scores = vec![5.0, 1.0, 2.0, 4.0, 3.0];
@@ -29,7 +29,10 @@ fn main() {
     for (name, method) in &methods {
         let ranks = method(&scores, alpha);
         let formatted: Vec<String> = ranks.iter().map(|r| format!("{r:.3}")).collect();
-        println!("  {name:<12} [{formatted}]", formatted = formatted.join(", "));
+        println!(
+            "  {name:<12} [{formatted}]",
+            formatted = formatted.join(", ")
+        );
     }
 
     // --- Ordering preservation check ---

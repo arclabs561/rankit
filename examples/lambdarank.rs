@@ -4,10 +4,7 @@
 //! higher-relevance documents toward higher scores. The gradients are
 //! weighted by the NDCG change from swapping each document pair.
 
-use rankit::{
-    compute_lambdarank_gradients, ndcg_at_k,
-    LambdaRankParams, LambdaRankTrainer,
-};
+use rankit::{compute_lambdarank_gradients, ndcg_at_k, LambdaRankParams, LambdaRankTrainer};
 
 fn main() {
     // Model scores (current predictions) and ground-truth relevance labels.
@@ -32,7 +29,13 @@ fn main() {
     println!("LambdaRank gradients (default params):");
     for (i, (&s, &l)) in scores.iter().zip(lambdas.iter()).enumerate() {
         let rel = relevance[i];
-        let direction = if l > 0.0 { "push DOWN" } else if l < 0.0 { "push UP" } else { "no change" };
+        let direction = if l > 0.0 {
+            "push DOWN"
+        } else if l < 0.0 {
+            "push UP"
+        } else {
+            "no change"
+        };
         println!("  doc_{i}: score={s:.1}, rel={rel:.0}, lambda={l:+.6} ({direction})");
     }
     // Negative lambda -> gradient pushes score up; positive -> pushes score down.
@@ -47,14 +50,8 @@ fn main() {
     });
 
     // Two queries, each with their own document set.
-    let batch_scores = vec![
-        vec![0.5, 0.8, 0.3],
-        vec![0.9, 0.2, 0.7, 0.4],
-    ];
-    let batch_relevance = vec![
-        vec![3.0, 1.0, 2.0],
-        vec![0.0, 3.0, 1.0, 2.0],
-    ];
+    let batch_scores = vec![vec![0.5, 0.8, 0.3], vec![0.9, 0.2, 0.7, 0.4]];
+    let batch_relevance = vec![vec![3.0, 1.0, 2.0], vec![0.0, 3.0, 1.0, 2.0]];
 
     let batch_lambdas = trainer
         .compute_gradients_batch(&batch_scores, &batch_relevance, None)

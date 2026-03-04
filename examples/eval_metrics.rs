@@ -11,8 +11,7 @@ fn main() {
     // --- Binary relevance ---
     // A search engine returned 10 documents; 4 are relevant.
     let ranked = vec![
-        "doc_1", "doc_7", "doc_3", "doc_9", "doc_2",
-        "doc_5", "doc_8", "doc_4", "doc_6", "doc_10",
+        "doc_1", "doc_7", "doc_3", "doc_9", "doc_2", "doc_5", "doc_8", "doc_4", "doc_6", "doc_10",
     ];
     let relevant: HashSet<&str> = ["doc_1", "doc_3", "doc_5", "doc_8"].into_iter().collect();
 
@@ -47,7 +46,7 @@ fn main() {
     qrels.insert("doc_3".into(), 2); // relevant
     qrels.insert("doc_5".into(), 1); // marginal
     qrels.insert("doc_8".into(), 1); // marginal
-    // doc_7, doc_9, doc_2, etc. are irrelevant (absent = 0)
+                                     // doc_7, doc_9, doc_2, etc. are irrelevant (absent = 0)
 
     println!("\n=== Graded relevance ===");
     println!("Judgments: {:?}\n", qrels);
