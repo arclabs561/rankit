@@ -45,6 +45,8 @@ serde_json = { version = "1.0", optional = true }
 proptest = "1.5"
 approx = "0.5"
 tempfile = "3"
+pare = "0.1"
+structops = { version = "0.1", path = "../structops" }
 
 [workspace]
 
