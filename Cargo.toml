@@ -11,6 +11,7 @@ repository = "https://github.com/arclabs561/rankit"
 documentation = "https://docs.rs/rankit"
 keywords = ["learning-to-rank", "ranking", "ndcg", "lambdarank", "ir-eval"]
 categories = ["algorithms", "science", "mathematics"]
+exclude = ["examples/soft_dtw_ranking.rs"]
 
 [features]
 default = ["eval", "losses"]
