@@ -70,6 +70,10 @@ pub mod sampling;
 #[cfg(feature = "eval")]
 pub mod eval;
 
+/// End-to-end retrieval pipeline: tokenize, index, score, rank.
+#[cfg(feature = "pipeline")]
+pub mod pipeline;
+
 // --- Re-exports: core ---
 
 pub use batch::{soft_rank_batch, spearman_loss_batch};
