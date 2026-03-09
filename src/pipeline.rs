@@ -198,10 +198,10 @@ impl Pipeline {
                 }
                 s
             }
-            Scoring::DirichletLm { mu } => self.lm_score(doc_id, query, dl, |tf, p_c| {
+            Scoring::DirichletLm { mu } => self.lm_score(doc_id, query, |tf, p_c| {
                 rankfns::lm_smoothed_p(tf, dl, p_c, rankfns::SmoothingMethod::Dirichlet { mu: *mu })
             }),
-            Scoring::JelinekMercerLm { lambda } => self.lm_score(doc_id, query, dl, |tf, p_c| {
+            Scoring::JelinekMercerLm { lambda } => self.lm_score(doc_id, query, |tf, p_c| {
                 rankfns::lm_smoothed_p(
                     tf,
                     dl,
@@ -212,13 +212,7 @@ impl Pipeline {
         }
     }
 
-    fn lm_score(
-        &self,
-        doc_id: DocId,
-        query: &[String],
-        _dl: f32,
-        smooth: impl Fn(f32, f32) -> f32,
-    ) -> f32 {
+    fn lm_score(&self, doc_id: DocId, query: &[String], smooth: impl Fn(f32, f32) -> f32) -> f32 {
         let mut log_s = 0.0f32;
         for t in query {
             let tf = self.index.term_frequency(doc_id, t.as_str()) as f32;
