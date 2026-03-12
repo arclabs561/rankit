@@ -1,3 +1,4 @@
+#![warn(missing_docs)]
 //! Learning to Rank for Rust: differentiable ranking, LTR losses, trainers,
 //! and IR evaluation metrics.
 //!
