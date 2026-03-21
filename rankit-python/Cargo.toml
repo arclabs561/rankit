@@ -18,6 +18,7 @@ doc = false
 [dependencies]
 rankit = { path = "..", features = ["eval", "losses"] }
 pyo3 = "0.28"
+numpy = "0.28"
 
 [workspace]
 resolver = "2"
