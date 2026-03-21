@@ -1,0 +1,23 @@
+[package]
+name = "rankit-python"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+license = "MIT OR Apache-2.0"
+authors = ["Arc <attobop@gmail.com>"]
+description = "Python bindings for rankit (Rust)."
+repository = "https://github.com/arclabs561/rankit"
+readme = "README.md"
+publish = false
+
+[lib]
+name = "ranklab"
+crate-type = ["cdylib"]
+doc = false
+
+[dependencies]
+rankit = { path = "..", features = ["eval", "losses"] }
+pyo3 = "0.28"
+
+[workspace]
+resolver = "2"

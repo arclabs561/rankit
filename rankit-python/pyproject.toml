@@ -1,0 +1,44 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "ranklab"
+version = "0.1.0"
+description = "Learning to Rank: differentiable ranking, LTR losses (RankNet, LambdaRank, ApproxNDCG, ListNet, ListMLE), and IR evaluation metrics."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT OR Apache-2.0" }
+authors = [{ name = "Arc", email = "attobop@gmail.com" }]
+keywords = ["learning-to-rank", "ranking", "ndcg", "lambdarank", "ir-eval", "information-retrieval"]
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.urls]
+Homepage = "https://github.com/arclabs561/rankit"
+Documentation = "https://docs.rs/rankit"
+Repository = "https://github.com/arclabs561/rankit"
+
+[tool.maturin]
+module-name = "ranklab"
+
+[tool.uv]
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "../Cargo.toml" },
+    { file = "../src/**/*.rs" },
+    { file = "src/**/*.rs" },
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.4.4",
+    "pytest-cov>=4.0.0",
+    "mypy>=1.0.0",
+]

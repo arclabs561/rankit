@@ -1,2 +1,7 @@
 /target
 Cargo.lock
+
+# Python bindings build artifacts
+rankit-python/target/
+rankit-python/.venv/
+rankit-python/Cargo.lock
