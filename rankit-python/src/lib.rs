@@ -465,5 +465,6 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
 #[pymodule]
 fn ranklab(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add("__version__", "0.1.0")?;
     register(py, m)
 }

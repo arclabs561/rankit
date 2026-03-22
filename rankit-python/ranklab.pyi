@@ -5,6 +5,8 @@ from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 from numpy.typing import NDArray
 
+__version__: str
+
 # Type alias: inputs accept numpy arrays or Python lists.
 _Scores = Union[NDArray[np.floating], List[float]]
 

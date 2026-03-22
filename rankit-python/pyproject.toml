@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "Learning to Rank: differentiable ranking, LTR losses (RankNet, LambdaRank, ApproxNDCG, ListNet, ListMLE), and IR evaluation metrics."
 readme = "README.md"
 requires-python = ">=3.8"
+dependencies = ["numpy>=1.20"]
 license = { text = "MIT OR Apache-2.0" }
 authors = [{ name = "Arc", email = "attobop@gmail.com" }]
 keywords = ["learning-to-rank", "ranking", "ndcg", "lambdarank", "ir-eval", "information-retrieval"]
@@ -35,9 +36,6 @@ cache-keys = [
     { file = "../src/**/*.rs" },
     { file = "src/**/*.rs" },
 ]
-
-[project.optional-dependencies]
-numpy = ["numpy>=1.20"]
 
 [dependency-groups]
 dev = [
