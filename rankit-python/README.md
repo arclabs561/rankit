@@ -49,6 +49,19 @@ score = ranklab.ndcg(ranked, qrels, k=3)
 | `mrr` | Mean Reciprocal Rank |
 | `precision_at_k` | Precision at depth k |
 | `recall_at_k` | Recall at depth k |
+| `err_at_k` | Expected Reciprocal Rank at depth k |
+| `rbp_at_k` | Rank-Biased Precision at depth k |
+| `f_measure_at_k` | F-measure (harmonic mean of P and R) at depth k |
+| `success_at_k` | Whether any relevant doc appears in top-k |
+| `r_precision` | Precision at R (R = number of relevant docs) |
+| `average_precision` | Average Precision for binary relevance |
+| `paired_t_test` | Paired t-test on two score sets, returns dict |
+| `confidence_interval` | Confidence interval for a score set |
+| `cohens_d` | Cohen's d effect size |
+| `load_trec_run` | Parse a TREC run file into {query_id: [(doc_id, score)]} |
+| `load_qrels` | Parse a TREC qrels file into {query_id: {doc_id: rel}} |
+| `evaluate_batch` | Batch evaluation across multiple queries |
+| `evaluate_trec` | Evaluate TREC run+qrels files with batch metrics |
 
 ## numpy support
 
