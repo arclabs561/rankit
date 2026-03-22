@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ranklab"
-version = "0.1.0"
+version = "0.1.1"
 description = "Learning to Rank: differentiable ranking, LTR losses (RankNet, LambdaRank, ApproxNDCG, ListNet, ListMLE), and IR evaluation metrics."
 readme = "README.md"
 requires-python = ">=3.8"
