@@ -162,6 +162,11 @@ fn differentiable_topk_py<'py>(
 fn ranknet_loss_py(predictions: &Bound<'_, PyAny>, relevance: &Bound<'_, PyAny>) -> PyResult<f64> {
     let predictions = extract_f64_vec(predictions)?;
     let relevance = extract_f64_vec(relevance)?;
+    if predictions.len() != relevance.len() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            format!("predictions length ({}) != relevance length ({})", predictions.len(), relevance.len())
+        ));
+    }
     Ok(ranknet_loss(&predictions, &relevance))
 }
 
@@ -185,6 +190,11 @@ fn approx_ndcg_py(
 ) -> PyResult<f64> {
     let predictions = extract_f64_vec(predictions)?;
     let relevance = extract_f64_vec(relevance)?;
+    if predictions.len() != relevance.len() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            format!("predictions length ({}) != relevance length ({})", predictions.len(), relevance.len())
+        ));
+    }
     Ok(approx_ndcg(&predictions, &relevance, temperature, k))
 }
 
@@ -206,6 +216,11 @@ fn lambda_loss_py(
 ) -> PyResult<f64> {
     let predictions = extract_f64_vec(predictions)?;
     let relevance = extract_f64_vec(relevance)?;
+    if predictions.len() != relevance.len() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            format!("predictions length ({}) != relevance length ({})", predictions.len(), relevance.len())
+        ));
+    }
     Ok(lambda_loss(&predictions, &relevance, k))
 }
 
@@ -227,6 +242,11 @@ fn listnet_loss_py(
 ) -> PyResult<f64> {
     let predictions = extract_f64_vec(predictions)?;
     let relevance = extract_f64_vec(relevance)?;
+    if predictions.len() != relevance.len() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            format!("predictions length ({}) != relevance length ({})", predictions.len(), relevance.len())
+        ));
+    }
     Ok(listnet_loss(&predictions, &relevance, temperature))
 }
 
@@ -248,6 +268,11 @@ fn listmle_loss_py(
 ) -> PyResult<f64> {
     let predictions = extract_f64_vec(predictions)?;
     let relevance = extract_f64_vec(relevance)?;
+    if predictions.len() != relevance.len() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            format!("predictions length ({}) != relevance length ({})", predictions.len(), relevance.len())
+        ));
+    }
     Ok(listmle_loss(&predictions, &relevance, temperature))
 }
 
@@ -278,6 +303,11 @@ fn compute_lambdarank_gradients_py<'py>(
 ) -> PyResult<Bound<'py, PyArray1<f32>>> {
     let scores = extract_f32_vec(scores)?;
     let relevance = extract_f32_vec(relevance)?;
+    if scores.len() != relevance.len() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            format!("scores length ({}) != relevance length ({})", scores.len(), relevance.len())
+        ));
+    }
     let params = LambdaRankParams {
         sigma,
         cost_sensitivity: cost_sensitive,
@@ -309,6 +339,11 @@ fn compute_ranking_svm_gradients_py<'py>(
 ) -> PyResult<Bound<'py, PyArray1<f32>>> {
     let scores = extract_f32_vec(scores)?;
     let relevance = extract_f32_vec(relevance)?;
+    if scores.len() != relevance.len() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            format!("scores length ({}) != relevance length ({})", scores.len(), relevance.len())
+        ));
+    }
     let params = RankingSVMParams {
         c,
         query_normalization: normalize_queries,

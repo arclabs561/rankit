@@ -1,6 +1,7 @@
 """Tests for ranklab Python bindings."""
 
 import numpy as np
+import pytest
 import ranklab
 
 
@@ -123,6 +124,26 @@ class TestLosses:
         loss = ranklab.listmle_loss(predictions, relevance, temperature=1.0)
         assert loss >= 0.0
 
+    def test_ranknet_loss_mismatched_lengths(self):
+        with pytest.raises(ValueError, match="length"):
+            ranklab.ranknet_loss([1, 2, 3], [1, 2])
+
+    def test_approx_ndcg_mismatched_lengths(self):
+        with pytest.raises(ValueError, match="length"):
+            ranklab.approx_ndcg([1, 2, 3], [1, 2])
+
+    def test_lambda_loss_mismatched_lengths(self):
+        with pytest.raises(ValueError, match="length"):
+            ranklab.lambda_loss([1, 2, 3], [1, 2])
+
+    def test_listnet_loss_mismatched_lengths(self):
+        with pytest.raises(ValueError, match="length"):
+            ranklab.listnet_loss([1, 2, 3], [1, 2])
+
+    def test_listmle_loss_mismatched_lengths(self):
+        with pytest.raises(ValueError, match="length"):
+            ranklab.listmle_loss([1, 2, 3], [1, 2])
+
     def test_losses_mixed_numpy_list(self):
         """Numpy predictions with list relevance (and vice versa)."""
         preds_np = np.array([0.9, 0.5, 0.1])
@@ -165,6 +186,14 @@ class TestGradients:
         relevance = [3.0, 1.0, 2.0]
         grads = ranklab.compute_ranking_svm_gradients(scores, relevance)
         assert len(grads) == 3
+
+    def test_lambdarank_gradients_mismatched_lengths(self):
+        with pytest.raises(ValueError, match="length"):
+            ranklab.compute_lambdarank_gradients([1, 2, 3], [1, 2])
+
+    def test_ranking_svm_gradients_mismatched_lengths(self):
+        with pytest.raises(ValueError, match="length"):
+            ranklab.compute_ranking_svm_gradients([1, 2, 3], [1, 2])
 
     def test_ranking_svm_gradients_numpy(self):
         scores = np.array([0.5, 0.8, 0.3], dtype=np.float32)

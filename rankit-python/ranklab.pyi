@@ -1,4 +1,8 @@
-"""Type stubs for ranklab Python bindings."""
+"""Type stubs for ranklab Python bindings.
+
+Note: NaN values in numeric inputs will propagate to the output silently.
+Filter NaN before calling if this is not desired.
+"""
 
 from typing import Dict, List, Optional, Tuple, Union
 
@@ -16,6 +20,9 @@ _Scores = Union[NDArray[np.floating], List[float]]
 
 def soft_rank(scores: _Scores, temperature: float = 1.0) -> NDArray[np.float64]:
     """Differentiable soft ranking using optimal-transport relaxation.
+
+    NaN values in scores will propagate to the output. Filter NaN before
+    calling if this is not desired.
 
     Args:
         scores: 1D array of scores to rank.
@@ -91,6 +98,9 @@ def ranknet_loss(predictions: _Scores, relevance: _Scores) -> float:
 
     Returns:
         Scalar loss value.
+
+    Raises:
+        ValueError: If predictions and relevance have different lengths.
     """
     ...
 
@@ -110,6 +120,9 @@ def approx_ndcg(
 
     Returns:
         Scalar loss value (negative approximate NDCG).
+
+    Raises:
+        ValueError: If predictions and relevance have different lengths.
     """
     ...
 
@@ -125,6 +138,9 @@ def lambda_loss(
 
     Returns:
         Scalar loss value.
+
+    Raises:
+        ValueError: If predictions and relevance have different lengths.
     """
     ...
 
@@ -140,6 +156,9 @@ def listnet_loss(
 
     Returns:
         Scalar loss value.
+
+    Raises:
+        ValueError: If predictions and relevance have different lengths.
     """
     ...
 
@@ -155,6 +174,9 @@ def listmle_loss(
 
     Returns:
         Scalar loss value.
+
+    Raises:
+        ValueError: If predictions and relevance have different lengths.
     """
     ...
 
@@ -180,6 +202,9 @@ def compute_lambdarank_gradients(
 
     Returns:
         numpy array of per-document gradient values (float32).
+
+    Raises:
+        ValueError: If scores and relevance have different lengths.
     """
     ...
 
@@ -199,6 +224,9 @@ def compute_ranking_svm_gradients(
 
     Returns:
         numpy array of per-document gradient values (float32).
+
+    Raises:
+        ValueError: If scores and relevance have different lengths.
     """
     ...
 

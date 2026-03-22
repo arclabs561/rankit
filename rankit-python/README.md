@@ -1,14 +1,14 @@
 # ranklab
 
-Python bindings for [rankit](https://docs.rs/rankit) -- differentiable ranking, LTR losses, and IR evaluation metrics.
+Differentiable ranking, learning-to-rank losses, and IR evaluation metrics, backed by a Rust implementation for low overhead per call.
+
+Python bindings for the [rankit](https://crates.io/crates/rankit) Rust crate.
 
 ## Install
 
-```
-pip install ranklab
-```
+    pip install ranklab
 
-## Usage
+## Quick start
 
 ```python
 import ranklab
@@ -30,13 +30,29 @@ score = ranklab.ndcg(ranked, qrels, k=3)
 
 ## API
 
-**Differentiable ranking:** `soft_rank`, `soft_rank_neural_sort`, `soft_rank_sigmoid`, `soft_rank_smooth_i`, `differentiable_topk`
+| Name | Description |
+|------|-------------|
+| `soft_rank` | Soft ranking via optimal-transport relaxation |
+| `soft_rank_neural_sort` | Soft ranking via NeuralSort relaxation |
+| `soft_rank_sigmoid` | Soft ranking via sigmoid pairwise comparisons |
+| `soft_rank_smooth_i` | Soft ranking via smooth indicator functions |
+| `differentiable_topk` | Differentiable top-k selection, returns (values, indicators) |
+| `ranknet_loss` | RankNet pairwise cross-entropy loss |
+| `approx_ndcg` | Differentiable NDCG approximation via softmax |
+| `lambda_loss` | LambdaLoss ranking loss |
+| `listnet_loss` | ListNet top-1 probability loss (KL divergence) |
+| `listmle_loss` | ListMLE likelihood loss for permutation learning |
+| `compute_lambdarank_gradients` | Per-document LambdaRank gradients |
+| `compute_ranking_svm_gradients` | Per-document RankingSVM gradients |
+| `ndcg` | Normalized Discounted Cumulative Gain at k |
+| `map_score` | Mean Average Precision |
+| `mrr` | Mean Reciprocal Rank |
+| `precision_at_k` | Precision at depth k |
+| `recall_at_k` | Recall at depth k |
 
-**LTR losses:** `ranknet_loss`, `approx_ndcg`, `lambda_loss`, `listnet_loss`, `listmle_loss`
+## numpy support
 
-**Gradients:** `compute_lambdarank_gradients`, `compute_ranking_svm_gradients`
-
-**Eval metrics:** `ndcg`, `map_score`, `mrr`, `precision_at_k`, `recall_at_k`
+Scoring and loss functions accept numpy arrays or Python lists. Gradient functions return numpy float32 arrays. Eval metrics take `list[tuple[str, float]]` for ranked results and `dict[str, int]` for relevance judgments.
 
 ## License
 
