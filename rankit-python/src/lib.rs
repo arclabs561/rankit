@@ -800,6 +800,39 @@ fn evaluate_trec_py<'py>(
 }
 
 // ---------------------------------------------------------------------------
+// Spearman loss (from fynch)
+// ---------------------------------------------------------------------------
+
+/// Spearman rank correlation loss (differentiable).
+///
+/// Computes a soft Spearman loss between predicted scores and target ranks
+/// using the fynch differentiable sorting primitives.
+///
+/// Args:
+///     predictions: 1D array of predicted scores.
+///     targets: 1D array of target values (higher = better).
+///     regularization_strength: Temperature for soft sorting. Default 1.0.
+///
+/// Returns:
+///     Scalar loss value.
+#[pyfunction(name = "spearman_loss")]
+#[pyo3(signature = (predictions, targets, regularization_strength = 1.0))]
+fn spearman_loss_py(
+    predictions: &Bound<'_, PyAny>,
+    targets: &Bound<'_, PyAny>,
+    regularization_strength: f64,
+) -> PyResult<f64> {
+    let preds = extract_f64_vec(predictions)?;
+    let targs = extract_f64_vec(targets)?;
+    if preds.len() != targs.len() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            format!("predictions length ({}) != targets length ({})", preds.len(), targs.len())
+        ));
+    }
+    Ok(rankit::spearman_loss(&preds, &targs, regularization_strength))
+}
+
+// ---------------------------------------------------------------------------
 // Module registration
 // ---------------------------------------------------------------------------
 
@@ -848,6 +881,9 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Batch evaluation
     m.add_function(wrap_pyfunction!(evaluate_batch_py, m)?)?;
     m.add_function(wrap_pyfunction!(evaluate_trec_py, m)?)?;
+
+    // Spearman loss (from fynch)
+    m.add_function(wrap_pyfunction!(spearman_loss_py, m)?)?;
 
     Ok(())
 }

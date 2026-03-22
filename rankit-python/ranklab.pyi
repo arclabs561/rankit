@@ -532,3 +532,26 @@ def evaluate_trec(
         IOError: If files cannot be read or have invalid format.
     """
     ...
+
+def spearman_loss(
+    predictions: Union[NDArray[np.floating], List[float]],
+    targets: Union[NDArray[np.floating], List[float]],
+    regularization_strength: float = 1.0,
+) -> float:
+    """Differentiable Spearman rank correlation loss (via fynch).
+
+    Computes a soft Spearman loss between predicted scores and target ranks.
+    Returns 0 for perfectly correlated inputs, higher for worse correlation.
+
+    Args:
+        predictions: 1D array of predicted scores.
+        targets: 1D array of target values.
+        regularization_strength: Temperature for soft sorting.
+
+    Returns:
+        Scalar loss value.
+
+    Raises:
+        ValueError: If inputs have different lengths.
+    """
+    ...
