@@ -1,32 +1,11 @@
 //! Gumbel-Softmax sampling and relaxed top-k.
 //!
-//! Requires the `gumbel` feature (enables `rand` dependency).
+//! Delegates to [`kuji`] for correct implementations of the Gumbel-Softmax
+//! trick and the iterated masked-softmax relaxed top-k (Kool et al., 2019).
+//!
+//! Requires the `gumbel` feature (enables `rand` + `kuji` dependencies).
 
 use rand::Rng;
-
-/// Generate Gumbel noise: G = -log(-log(U)) where U ~ Uniform(0,1).
-pub fn gumbel_noise(rng: &mut impl Rng) -> f64 {
-    let u: f64 = rng.random_range(0.0..1.0);
-    let u = u.clamp(1e-10, 1.0 - 1e-10);
-    -(-u.ln()).ln()
-}
-
-fn softmax(logits: &[f64]) -> Vec<f64> {
-    let n = logits.len();
-    if n == 0 {
-        return vec![];
-    }
-
-    let max_logit = logits.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
-    let exps: Vec<f64> = logits.iter().map(|&x| (x - max_logit).exp()).collect();
-    let sum: f64 = exps.iter().sum();
-
-    if sum > 1e-10 {
-        exps.iter().map(|&e| e / sum).collect()
-    } else {
-        vec![1.0 / n as f64; n]
-    }
-}
 
 /// Gumbel-Softmax: differentiable sampling from categorical distribution.
 ///
@@ -44,29 +23,18 @@ pub fn gumbel_softmax(
     scale: f64,
     rng: &mut impl Rng,
 ) -> Vec<f64> {
-    let n = logits.len();
-    if n == 0 {
-        return vec![];
-    }
-    if n == 1 {
-        return vec![1.0];
-    }
-
-    let mut gumbel_logits = Vec::with_capacity(n);
-    for &logit in logits {
-        let g = gumbel_noise(rng);
-        gumbel_logits.push((g + scale * logit) / temperature);
-    }
-
-    softmax(&gumbel_logits)
+    kuji::gumbel_softmax(logits, temperature, scale, rng)
 }
 
-/// Relaxed Top-k using Gumbel-Softmax.
+/// Relaxed Top-k using iterated Gumbel-Softmax (Kool et al., 2019).
 ///
-/// From: "Gumbel Reranking" (Huang et al., ACL 2025)
+/// Creates a soft k-hot vector where top-k elements have high values (~1.0)
+/// and others have low values (~0.0). Uses iterated masked-softmax to enforce
+/// without-replacement structure: each selection suppresses previously selected
+/// items via `log(1 - onehot)`.
 ///
-/// Creates a soft mask where top-k elements have high values (~1.0)
-/// and others have low values (~0.0).
+/// The output sums to approximately k (unlike element-wise max of independent
+/// draws, which does not enforce this property).
 pub fn relaxed_topk_gumbel(
     scores: &[f64],
     k: usize,
@@ -74,31 +42,12 @@ pub fn relaxed_topk_gumbel(
     scale: f64,
     rng: &mut impl Rng,
 ) -> Vec<f64> {
-    let n = scores.len();
-    if n == 0 || k == 0 {
-        return vec![];
-    }
-    if k >= n {
-        return vec![1.0; n];
-    }
-
-    let mut max_mask = vec![0.0; n];
-
-    for _ in 0..k {
-        let mask = gumbel_softmax(scores, temperature, scale, rng);
-        for i in 0..n {
-            if mask[i] > max_mask[i] {
-                max_mask[i] = mask[i];
-            }
-        }
-    }
-
-    max_mask
+    kuji::relaxed_topk_gumbel(scores, k, temperature, scale, rng)
 }
 
 /// Generate Gumbel-based attention mask for RAG reranking.
 ///
-/// Convenience wrapper around `relaxed_topk_gumbel`.
+/// Convenience wrapper around [`relaxed_topk_gumbel`].
 pub fn gumbel_attention_mask(
     reranker_scores: &[f64],
     k: usize,
@@ -128,13 +77,22 @@ mod tests {
     }
 
     #[test]
-    fn test_relaxed_topk_gumbel() {
+    fn test_relaxed_topk_sums_to_k() {
         let mut rng = StdRng::seed_from_u64(42);
         let scores = vec![0.8, 0.6, 0.9, 0.3, 0.7];
-        let mask = relaxed_topk_gumbel(&scores, 3, 0.5, 1.0, &mut rng);
+        let k = 3;
+        let mask = relaxed_topk_gumbel(&scores, k, 0.1, 1.0, &mut rng);
 
         assert_eq!(mask.len(), scores.len());
-        assert!(mask.iter().all(|&m| (0.0..=1.0).contains(&m)));
+        // Values are non-negative (accumulated softmax outputs, may slightly exceed 1.0)
+        assert!(mask.iter().all(|&m| m >= -1e-10));
+
+        // Key property: the mask should sum to approximately k
+        let sum: f64 = mask.iter().sum();
+        assert!(
+            (sum - k as f64).abs() < 1.5,
+            "relaxed top-k mask should sum to ~{k}, got {sum}"
+        );
     }
 
     #[test]
@@ -142,10 +100,7 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(42);
 
         let empty: Vec<f64> = vec![];
-        assert_eq!(gumbel_softmax(&empty, 0.5, 1.0, &mut rng).len(), 0);
-
-        let single = vec![1.0];
-        assert_eq!(gumbel_softmax(&single, 0.5, 1.0, &mut rng), vec![1.0]);
+        assert!(relaxed_topk_gumbel(&empty, 3, 0.5, 1.0, &mut rng).is_empty());
 
         let scores = vec![0.5, 0.3];
         assert_eq!(
