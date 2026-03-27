@@ -63,6 +63,9 @@ pub mod losses;
 /// Differentiable top-k selection.
 pub mod topk;
 
+/// Top-k cross-entropy loss for classification.
+pub mod topk_ce;
+
 /// Gumbel-Softmax sampling and relaxed top-k.
 #[cfg(feature = "gumbel")]
 pub mod sampling;
@@ -79,8 +82,9 @@ pub mod pipeline;
 
 pub use batch::{soft_rank_batch, spearman_loss_batch};
 pub use gradients::{
-    compute_lambdarank_gradients, compute_ranking_svm_gradients, ndcg_at_k, pairwise_hinge_loss,
-    sigmoid_derivative, soft_rank_gradient, spearman_loss_gradient, GradientError,
+    compute_lambdarank_gradients, compute_ranking_svm_gradients, fisher_information_softmax,
+    natural_gradient_softmax, ndcg_at_k, pairwise_hinge_loss, sigmoid_derivative,
+    soft_rank_gradient, spearman_loss_gradient, with_natural_gradient, GradientError,
     LambdaRankParams, LambdaRankTrainer, RankingSVMParams, RankingSVMTrainer,
 };
 pub use methods::{
@@ -119,3 +123,6 @@ pub use eval::{batch as eval_batch, binary, export, graded, statistics, trec, va
 
 #[cfg(test)]
 mod proptests;
+
+#[cfg(test)]
+mod gradient_tests;

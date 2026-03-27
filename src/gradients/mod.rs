@@ -6,6 +6,8 @@
 
 mod error;
 mod lambdarank;
+/// Natural gradient via Fisher information for softmax-based ranking losses.
+pub mod natural;
 mod ranking_svm;
 
 use crate::rank::sigmoid;
@@ -17,6 +19,7 @@ pub use error::GradientError;
 pub use lambdarank::{
     compute_lambdarank_gradients, ndcg_at_k, LambdaRankParams, LambdaRankTrainer,
 };
+pub use natural::{fisher_information_softmax, natural_gradient_softmax, with_natural_gradient};
 pub use ranking_svm::{
     compute_ranking_svm_gradients, pairwise_hinge_loss, RankingSVMParams, RankingSVMTrainer,
 };
