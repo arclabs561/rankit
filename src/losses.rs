@@ -224,8 +224,8 @@ pub fn approx_ndcg(
         }
 
         let gain = 2.0_f64.powf(relevance[i]) - 1.0;
-        let soft_rank_normalized = soft_ranks[i] * (n as f64 - 1.0);
-        let soft_discount = 1.0 / (soft_rank_normalized + 2.0).log2();
+        let position = (n as f64 - 1.0) - soft_ranks[i];
+        let soft_discount = 1.0 / (position + 2.0).log2();
 
         approx_dcg += gain * soft_discount;
     }
