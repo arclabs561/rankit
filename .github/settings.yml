@@ -2,7 +2,7 @@
 # https://github.com/repository-settings/app
 
 repository:
-  description: "Learning to Rank: differentiable ranking, LTR losses (RankNet, LambdaRank, ApproxNDCG, ListNet, ListMLE), trainers, and IR evaluation metrics"
+  description: "Learning-to-rank losses and evaluation"
   homepage: "https://docs.rs/rankit"
   private: false
   has_issues: true
