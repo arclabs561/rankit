@@ -5,3 +5,4 @@ Cargo.lock
 rankit-python/target/
 rankit-python/.venv/
 rankit-python/Cargo.lock
+proptest-regressions/
