@@ -23,7 +23,7 @@ Learning to Rank for Rust: differentiable ranking, LTR losses, trainers, and IR 
 | LambdaLoss | RankNet weighted by $\lvert\Delta\text{NDCG}\_{ij}\rvert$ per swapped pair |
 | ApproxNDCG | $-\sum_i G(y_i) \cdot D\bigl(\hat{\pi}_i(\mathbf{s})\bigr)$ with soft rank $\hat{\pi}$ |
 | ListNet | $\text{KL}\bigl(P_y \;\lVert\; P_s\bigr)$ where $P_z(i) = e^{z_i} / \sum_j e^{z_j}$ |
-| ListMLE | $-\sum_{k=1}^{n} \log \frac{e^{s_{\pi(k)}}}{\sum_{j=k}^{n} e^{s_{\pi(j)}}}$ (likelihood of ground-truth permutation $\pi$) |
+| ListMLE | $-\sum\_{k=1}^{n} \log \frac{e^{s\_{\pi(k)}}}{\sum\_{j=k}^{n} e^{s\_{\pi(j)}}}$ (likelihood of ground-truth permutation $\pi$) |
 
 ## Quick start
 
