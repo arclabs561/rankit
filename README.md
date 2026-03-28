@@ -8,12 +8,22 @@ Learning to Rank for Rust: differentiable ranking, LTR losses, trainers, and IR 
 
 ## What it does
 
-- **Differentiable ranking** -- sigmoid-based soft ranking with multiple method variants from the literature (NeuralSort, SoftRank/Probabilistic, SmoothI). O(n^2) complexity, suitable for lists up to ~1000 items.
-- **LTR loss functions** -- RankNet (Burges 2005), LambdaLoss (NDCG-weighted pairwise), ApproxNDCG (Qin & Liu 2010), ListNet (ICML 2007), ListMLE (ICML 2008).
+- **Differentiable ranking** -- sigmoid-based soft ranking: $\hat{R}_i(\mathbf{s}) = \sum_{j \neq i} \sigma\bigl(\tau(s_j - s_i)\bigr)$. Variants: NeuralSort, SoftRank/Probabilistic, SmoothI. $O(n^2)$, suitable for lists up to ~1000 items.
+- **LTR loss functions** -- RankNet, LambdaLoss, ApproxNDCG, ListNet, ListMLE (see formulas below).
 - **Gradient trainers** -- LambdaRank and Ranking SVM with configurable query normalization, cost sensitivity, and score normalization.
 - **IR evaluation metrics** -- NDCG, MAP, MRR, Precision@K, Recall@K, ERR, RBP, F-measure, R-Precision, Success@K. Binary and graded relevance.
 - **TREC format parsing** -- load standard TREC run files and qrels, batch evaluate, export CSV/JSON.
 - **Statistical testing** -- paired t-test, confidence intervals, Cohen's d effect size.
+
+### Loss functions
+
+| Loss | Formula |
+|------|---------|
+| RankNet | $\mathcal{L} = \sum_{(i,j): y_i > y_j} \log\bigl(1 + e^{-(s_i - s_j)}\bigr)$ |
+| LambdaLoss | RankNet weighted by $\lvert\Delta\text{NDCG}\_{ij}\rvert$ per swapped pair |
+| ApproxNDCG | $-\sum_i G(y_i) \cdot D\bigl(\hat{\pi}_i(\mathbf{s})\bigr)$ with soft rank $\hat{\pi}$ |
+| ListNet | $\text{KL}\bigl(P_y \;\lVert\; P_s\bigr)$ where $P_z(i) = e^{z_i} / \sum_j e^{z_j}$ |
+| ListMLE | $-\sum_{k=1}^{n} \log \frac{e^{s_{\pi(k)}}}{\sum_{j=k}^{n} e^{s_{\pi(j)}}}$ (likelihood of ground-truth permutation $\pi$) |
 
 ## Quick start
 
