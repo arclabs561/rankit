@@ -4,7 +4,7 @@
 [![Documentation](https://docs.rs/rankit/badge.svg)](https://docs.rs/rankit)
 [![CI](https://github.com/arclabs561/rankit/actions/workflows/ci.yml/badge.svg)](https://github.com/arclabs561/rankit/actions/workflows/ci.yml)
 
-Learning to Rank for Rust: differentiable ranking, LTR losses, trainers, and IR evaluation metrics.
+Learning-to-rank losses and evaluation.
 
 ## What it does
 
