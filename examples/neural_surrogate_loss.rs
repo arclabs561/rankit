@@ -36,7 +36,13 @@ fn main() {
 
     println!("NeuralLoss-style surrogate learning");
     println!("  {} training permutations, {} items", samples.len(), n);
-    println!("  Learned weights: {:?}", weights.iter().map(|w| format!("{w:.3}")).collect::<Vec<_>>());
+    println!(
+        "  Learned weights: {:?}",
+        weights
+            .iter()
+            .map(|w| format!("{w:.3}"))
+            .collect::<Vec<_>>()
+    );
     println!();
 
     // Evaluate: does the surrogate rank permutations similarly to true NDCG?
@@ -96,7 +102,11 @@ fn compute_ndcg(scores: &[f64], relevance: &[f64]) -> f64 {
         idcg += (2.0_f64.powf(r) - 1.0) / (rank as f64 + 2.0).log2();
     }
 
-    if idcg == 0.0 { 0.0 } else { dcg / idcg }
+    if idcg == 0.0 {
+        0.0
+    } else {
+        dcg / idcg
+    }
 }
 
 fn generate_permutations(n: usize, count: usize, seed: u64) -> Vec<Vec<usize>> {
@@ -144,7 +154,11 @@ fn fit_linear_surrogate(
         // Gradient clipping.
         let grad_norm: f64 = grad.iter().map(|g| g * g).sum::<f64>().sqrt();
         let clip = 10.0;
-        let scale = if grad_norm > clip { clip / grad_norm } else { 1.0 };
+        let scale = if grad_norm > clip {
+            clip / grad_norm
+        } else {
+            1.0
+        };
         for i in 0..n {
             weights[i] -= lr * scale * grad[i] / batch;
         }
@@ -189,7 +203,11 @@ fn spearman_correlation(x: &[f64], y: &[f64]) -> f64 {
     }
 
     let denom = (var_x * var_y).sqrt();
-    if denom < 1e-15 { 0.0 } else { cov / denom }
+    if denom < 1e-15 {
+        0.0
+    } else {
+        cov / denom
+    }
 }
 
 fn rank(values: &[f64]) -> Vec<f64> {
