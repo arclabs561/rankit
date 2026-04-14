@@ -9,7 +9,9 @@ pub enum GradientError {
     EmptyInput,
     /// Length mismatch between scores and relevance.
     LengthMismatch {
+        /// Number of elements in the scores slice.
         scores_len: usize,
+        /// Number of elements in the relevance slice.
         relevance_len: usize,
     },
     /// Invalid parameter value.
@@ -17,7 +19,12 @@ pub enum GradientError {
     /// Invalid relevance scores (e.g., negative values when not allowed).
     InvalidRelevance(String),
     /// Invalid NDCG computation (e.g., k=0 or k > length).
-    InvalidNDCG { k: usize, length: usize },
+    InvalidNDCG {
+        /// The requested k value.
+        k: usize,
+        /// The length of the input.
+        length: usize,
+    },
 }
 
 impl fmt::Display for GradientError {

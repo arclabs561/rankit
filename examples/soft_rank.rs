@@ -21,6 +21,7 @@ fn main() {
     // --- Compare ranking methods ---
     let alpha = 5.0;
     println!("\nMethod comparison (alpha={alpha}):");
+    #[allow(clippy::type_complexity)]
     let methods: [(&str, fn(&[f64], f64) -> Vec<f64>); 3] = [
         ("Sigmoid", soft_rank_sigmoid),
         ("NeuralSort", soft_rank_neural_sort),

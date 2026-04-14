@@ -1,7 +1,6 @@
 //! Export utilities for evaluation results (CSV, JSON).
 
 use crate::eval::batch::BatchResults;
-use std::collections::HashMap;
 use std::io::Write;
 
 /// Export batch results to CSV format.

@@ -85,7 +85,7 @@ fn main() {
 }
 
 fn compute_ndcg(scores: &[f64], relevance: &[f64]) -> f64 {
-    let n = scores.len();
+    let _n = scores.len();
     let mut indexed: Vec<(usize, f64)> = scores.iter().enumerate().map(|(i, &s)| (i, s)).collect();
     indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
 
