@@ -45,19 +45,19 @@ pub fn precision_at_k<I: Eq + std::hash::Hash>(
     k: usize,
 ) -> f64 {
     let ranks = extract_ranks(ranked, relevant);
-    fynch::metrics::precision_at_k(&ranks, k)
+    rankops::metrics::precision_at_k(&ranks, k)
 }
 
 /// Recall at k: fraction of relevant docs in top-k.
 pub fn recall_at_k<I: Eq + std::hash::Hash>(ranked: &[I], relevant: &HashSet<I>, k: usize) -> f64 {
     let ranks = extract_ranks(ranked, relevant);
-    fynch::metrics::recall_at_k(&ranks, relevant.len(), k)
+    rankops::metrics::recall_at_k(&ranks, relevant.len(), k)
 }
 
 /// Mean Reciprocal Rank: 1 / rank of first relevant document.
 pub fn mrr<I: Eq + std::hash::Hash>(ranked: &[I], relevant: &HashSet<I>) -> f64 {
     let ranks = extract_ranks(ranked, relevant);
-    fynch::metrics::mrr(&ranks)
+    rankops::metrics::mrr(&ranks)
 }
 
 /// Discounted Cumulative Gain at k.
@@ -67,7 +67,7 @@ pub fn dcg_at_k<I: Eq + std::hash::Hash>(ranked: &[I], relevant: &HashSet<I>, k:
         .take(k)
         .map(|id| if relevant.contains(id) { 1.0 } else { 0.0 })
         .collect();
-    fynch::metrics::dcg(&relevance)
+    rankops::metrics::dcg(&relevance)
 }
 
 /// Ideal DCG at k.
@@ -75,7 +75,7 @@ pub fn idcg_at_k(n_relevant: usize, k: usize) -> f64 {
     let ideal_relevance: Vec<f64> = (0..k)
         .map(|i| if i < n_relevant { 1.0 } else { 0.0 })
         .collect();
-    fynch::metrics::dcg(&ideal_relevance)
+    rankops::metrics::dcg(&ideal_relevance)
 }
 
 /// Normalized DCG at k.
@@ -88,19 +88,19 @@ pub fn ndcg_at_k<I: Eq + std::hash::Hash>(ranked: &[I], relevant: &HashSet<I>, k
     let ideal_relevance: Vec<f64> = (0..k)
         .map(|i| if i < relevant.len() { 1.0 } else { 0.0 })
         .collect();
-    fynch::metrics::ndcg(&relevance, &ideal_relevance)
+    rankops::metrics::ndcg(&relevance, &ideal_relevance)
 }
 
 /// Average Precision: average of precision at each relevant doc.
 pub fn average_precision<I: Eq + std::hash::Hash>(ranked: &[I], relevant: &HashSet<I>) -> f64 {
     let ranks = extract_ranks(ranked, relevant);
-    fynch::metrics::average_precision(&ranks, relevant.len())
+    rankops::metrics::average_precision(&ranks, relevant.len())
 }
 
 /// Expected Reciprocal Rank (ERR).
 pub fn err_at_k<I: Eq + std::hash::Hash>(ranked: &[I], relevant: &HashSet<I>, k: usize) -> f64 {
     let ranks = extract_ranks(ranked, relevant);
-    fynch::metrics::err_at_k(&ranks, k)
+    rankops::metrics::err_at_k(&ranks, k)
 }
 
 /// Rank-Biased Precision (RBP).
@@ -111,7 +111,7 @@ pub fn rbp_at_k<I: Eq + std::hash::Hash>(
     persistence: f64,
 ) -> f64 {
     let ranks = extract_ranks(ranked, relevant);
-    fynch::metrics::rbp_at_k(&ranks, k, persistence)
+    rankops::metrics::rbp_at_k(&ranks, k, persistence)
 }
 
 /// F-measure at k: harmonic mean of precision and recall.
@@ -122,19 +122,19 @@ pub fn f_measure_at_k<I: Eq + std::hash::Hash>(
     beta: f64,
 ) -> f64 {
     let ranks = extract_ranks(ranked, relevant);
-    fynch::metrics::f_measure_at_k(&ranks, relevant.len(), k, beta)
+    rankops::metrics::f_measure_at_k(&ranks, relevant.len(), k, beta)
 }
 
 /// Success at k: whether at least one relevant document is in top-k.
 pub fn success_at_k<I: Eq + std::hash::Hash>(ranked: &[I], relevant: &HashSet<I>, k: usize) -> f64 {
     let ranks = extract_ranks(ranked, relevant);
-    fynch::metrics::hits_at_k(&ranks, k).min(1.0)
+    rankops::metrics::hits_at_k(&ranks, k).min(1.0)
 }
 
 /// R-Precision: Precision at R, where R is the number of relevant documents.
 pub fn r_precision<I: Eq + std::hash::Hash>(ranked: &[I], relevant: &HashSet<I>) -> f64 {
     let ranks = extract_ranks(ranked, relevant);
-    fynch::metrics::r_precision(&ranks, relevant.len())
+    rankops::metrics::r_precision(&ranks, relevant.len())
 }
 
 /// All metrics for a single ranking (binary relevance).

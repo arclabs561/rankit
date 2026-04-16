@@ -25,7 +25,7 @@ pub fn compute_ndcg(ranked: &[(String, f32)], qrels: &HashMap<String, u32>, k: u
     ideal_gains.sort_unstable_by(|a, b| b.partial_cmp(a).unwrap());
     let ideal_k: Vec<f64> = ideal_gains.into_iter().take(k).collect();
 
-    fynch::metrics::ndcg(&relevance, &ideal_k)
+    rankops::metrics::ndcg(&relevance, &ideal_k)
 }
 
 /// Compute Mean Average Precision (MAP) for graded relevance.
@@ -44,7 +44,7 @@ pub fn compute_map(ranked: &[(String, f32)], qrels: &HashMap<String, u32>) -> f6
         .map(|(i, _)| i + 1)
         .collect();
 
-    fynch::metrics::average_precision(&ranks, n_relevant)
+    rankops::metrics::average_precision(&ranks, n_relevant)
 }
 
 #[cfg(test)]
