@@ -6,3 +6,4 @@ rankit-python/target/
 rankit-python/.venv/
 rankit-python/Cargo.lock
 proptest-regressions/
+/semver-checks/
