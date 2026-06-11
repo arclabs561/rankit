@@ -141,19 +141,33 @@ pub fn r_precision<I: Eq + std::hash::Hash>(ranked: &[I], relevant: &HashSet<I>)
 #[cfg(feature = "serde")]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Metrics {
+    /// Precision at rank 1.
     pub precision_at_1: f64,
+    /// Precision at rank 5.
     pub precision_at_5: f64,
+    /// Precision at rank 10.
     pub precision_at_10: f64,
+    /// Recall at rank 5.
     pub recall_at_5: f64,
+    /// Recall at rank 10.
     pub recall_at_10: f64,
+    /// Mean reciprocal rank.
     pub mrr: f64,
+    /// Normalized discounted cumulative gain at rank 5.
     pub ndcg_at_5: f64,
+    /// Normalized discounted cumulative gain at rank 10.
     pub ndcg_at_10: f64,
+    /// Average precision over all relevant documents.
     pub average_precision: f64,
+    /// Expected reciprocal rank at rank 10.
     pub err_at_10: f64,
+    /// Rank-biased precision at rank 10.
     pub rbp_at_10: f64,
+    /// F1 score at rank 10.
     pub f1_at_10: f64,
+    /// Whether any relevant document appears in the top 10.
     pub success_at_10: f64,
+    /// Precision at rank R, where R is the number of relevant documents.
     pub r_precision: f64,
 }
 

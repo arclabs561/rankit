@@ -1,6 +1,8 @@
 //! Export utilities for evaluation results (CSV, JSON).
 
 use crate::eval::batch::BatchResults;
+#[cfg(feature = "serde")]
+use std::collections::HashMap;
 use std::io::Write;
 
 /// Export batch results to CSV format.
