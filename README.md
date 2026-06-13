@@ -47,7 +47,8 @@ let loss = ranknet_loss(&predictions, &relevance);
 |------------|---------|-------------|
 | `eval`     | yes     | IR evaluation metrics, TREC parsing, batch eval, statistics |
 | `losses`   | yes     | LTR loss functions (RankNet, LambdaLoss, ApproxNDCG, ListNet, ListMLE) |
-| `gumbel`   | no      | Gumbel-Softmax sampling, relaxed top-k (requires `rand`) |
+| `gumbel`   | no      | Gumbel-Softmax sampling, relaxed top-k (delegates to `kuji`, pulls `rand`) |
+| `pipeline` | no      | End-to-end retrieval pipeline: tokenize, index, score, rank (pulls `textprep`, `postings`, `rankfns`) |
 | `parallel` | no      | Rayon parallelization for batch operations |
 | `serde`    | no      | Serialization for eval result types |
 
