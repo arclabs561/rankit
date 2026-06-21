@@ -5,7 +5,7 @@ edition = "2021"
 rust-version = "1.74"
 license = "MIT OR Apache-2.0"
 authors = ["Arc <attobop@gmail.com>"]
-description = "Learning to Rank: differentiable ranking, LTR losses (RankNet, LambdaRank, ApproxNDCG, ListNet, ListMLE), trainers, and IR evaluation metrics"
+description = "Learning-to-rank losses and evaluation"
 homepage = "https://github.com/arclabs561/rankit"
 repository = "https://github.com/arclabs561/rankit"
 documentation = "https://docs.rs/rankit"
@@ -35,7 +35,7 @@ serde = ["dep:serde", "dep:serde_json"]
 pipeline = ["dep:textprep", "dep:postings", "dep:rankfns"]
 
 [dependencies]
-fynch = "0.1.0"
+fynch = "0.2"
 rankops = "0.1.6"
 thiserror = "2.0"
 
