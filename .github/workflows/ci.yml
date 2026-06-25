@@ -28,6 +28,10 @@ jobs:
 
       - name: Test
         run: cargo test --all-features
+      - name: Run example assertions
+        run: |
+          cargo run --example soft_dtw_ranking
+          cargo run --example soft_rank
 
       - name: Semver check
         if: github.event_name == 'pull_request'
