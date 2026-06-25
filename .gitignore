@@ -1,6 +1,9 @@
 /target
 Cargo.lock
 
+# Real datasets fetched by scripts/fetch_*.sh (examples only)
+/data/
+
 # Python bindings build artifacts
 rankit-python/target/
 rankit-python/.venv/
