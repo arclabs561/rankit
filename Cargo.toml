@@ -57,10 +57,14 @@ tempfile = "3"
 pare = "0.2"
 structops = { version = "0.2" }
 statskit = "0.1.1"
+descend = "0.1.1"
 
 [[example]]
 name = "retrieval_pipeline"
 required-features = ["pipeline", "eval"]
+
+[[example]]
+name = "train_with_schedule"
 
 [[example]]
 name = "ltr_significance"
