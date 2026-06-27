@@ -135,8 +135,15 @@ pub fn f_measure_at_k<I: Eq + std::hash::Hash>(
 
 /// Success at k: whether at least one relevant document is in top-k.
 pub fn success_at_k<I: Eq + std::hash::Hash>(ranked: &[I], relevant: &HashSet<I>, k: usize) -> f64 {
+    // Binary: 1.0 if any relevant document falls in the top k, else 0.0.
+    // hits_at_k(&ranks, k) would instead return (relevant in top-k) / (total
+    // relevant) = recall@k, a fraction, which is not success@k.
     let ranks = extract_ranks(ranked, relevant);
-    rankops::metrics::hits_at_k(&ranks, k).min(1.0)
+    if ranks.iter().any(|&r| r > 0 && r <= k) {
+        1.0
+    } else {
+        0.0
+    }
 }
 
 /// R-Precision: Precision at R, where R is the number of relevant documents.
@@ -251,5 +258,16 @@ mod tests {
 
         let ap = average_precision(&ranked, &relevant);
         assert!(ap > 0.8 && ap < 0.85);
+    }
+
+    #[test]
+    fn test_success_at_k_is_binary() {
+        // Relevant docs at ranks 2 and 7. success@3 must be 1.0 (rank 2 <= 3),
+        // not the fraction of relevant docs in the top 3 (which would be 0.5).
+        let ranked = vec!["a", "b", "c", "d", "e", "f", "g"];
+        let relevant: HashSet<_> = ["b", "g"].into_iter().collect();
+        assert!((success_at_k(&ranked, &relevant, 3) - 1.0).abs() < 1e-9);
+        // And 0.0 when no relevant doc is in the top-k.
+        assert!(success_at_k(&ranked, &relevant, 1).abs() < 1e-9);
     }
 }
