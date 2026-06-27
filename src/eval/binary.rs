@@ -56,8 +56,16 @@ pub fn recall_at_k<I: Eq + std::hash::Hash>(ranked: &[I], relevant: &HashSet<I>,
 
 /// Mean Reciprocal Rank: 1 / rank of first relevant document.
 pub fn mrr<I: Eq + std::hash::Hash>(ranked: &[I], relevant: &HashSet<I>) -> f64 {
+    // `extract_ranks` returns the ranks of every relevant document in ascending
+    // order, so the first entry is the first relevant rank. Only that rank
+    // defines the reciprocal rank for a single ranking. Passing all of them to
+    // `rankops::metrics::mrr` would average 1/rank over every relevant document,
+    // which is not MRR (it under-reports whenever there is more than one
+    // relevant document).
     let ranks = extract_ranks(ranked, relevant);
-    rankops::metrics::mrr(&ranks)
+    ranks
+        .first()
+        .map_or(0.0, |&first| rankops::metrics::mrr(&[first]))
 }
 
 /// Discounted Cumulative Gain at k.
@@ -213,6 +221,15 @@ mod tests {
         let ranked = vec!["a", "b", "c"];
         let relevant: HashSet<_> = ["b"].into_iter().collect();
 
+        assert!((mrr(&ranked, &relevant) - 0.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_mrr_multiple_relevant_uses_first() {
+        // Relevant docs at ranks 2 and 4. MRR is the reciprocal of the FIRST
+        // relevant rank (1/2), not the mean of 1/2 and 1/4 (= 0.375).
+        let ranked = vec!["a", "b", "c", "d"];
+        let relevant: HashSet<_> = ["b", "d"].into_iter().collect();
         assert!((mrr(&ranked, &relevant) - 0.5).abs() < 1e-9);
     }
 
