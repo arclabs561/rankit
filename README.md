@@ -52,6 +52,21 @@ let loss = ranknet_loss(&predictions, &relevance);
 | `parallel` | no      | Rayon parallelization for batch operations |
 | `serde`    | no      | Serialization for eval result types |
 
+## Examples
+
+See [`examples/README.md`](examples/README.md) for the full gallery: each
+example states the question it answers, the run command, feature flags or data
+requirements, and real sample output.
+
+| Example | What it shows |
+|---------|---------------|
+| `eval_metrics` | Binary and graded IR metrics |
+| `soft_rank` | Differentiable ranks at different sharpness values |
+| `lambdarank` | Per-document LambdaRank gradients |
+| `train_with_schedule` | RankNet training with a warmup-cosine schedule |
+| `ltr_lightgbm_train_eval` | LambdaRank on the LightGBM ranking dataset |
+| `retrieval_pipeline` | BM25 retrieval with the `pipeline` and `eval` features |
+
 ## Crate topology
 
 `rankit` builds on [`fynch`](https://crates.io/crates/fynch) (Fenchel-Young losses, differentiable sorting primitives). Related crates:

@@ -128,11 +128,13 @@ fn main() -> ExitCode {
     let test_q = dir.join("rank.test.query");
 
     if !train_data.exists() {
+        // Data-gated: no-op cleanly (exit 0) when the dataset is absent, so CI
+        // that compiles/runs examples does not fail on the missing fixture.
         eprintln!(
             "dataset not found at {}\nrun: ./scripts/fetch_lightgbm_rank.sh",
             dir.display()
         );
-        return ExitCode::FAILURE;
+        return ExitCode::SUCCESS;
     }
 
     let n_features = max_feature_index(&[&train_data, &test_data]).unwrap();
