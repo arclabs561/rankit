@@ -8,12 +8,12 @@ Learning-to-rank losses and evaluation.
 
 ## What it does
 
-- **Differentiable ranking** -- sigmoid-based soft ranking: $\hat{R}_i(\mathbf{s}) = \sum_{j \neq i} \sigma\bigl(\tau(s_j - s_i)\bigr)$. Variants: NeuralSort, SoftRank/Probabilistic, SmoothI. $O(n^2)$, suitable for lists up to ~1000 items.
-- **LTR loss functions** -- RankNet, LambdaLoss, ApproxNDCG, ListNet, ListMLE (see formulas below).
-- **Gradient trainers** -- LambdaRank and Ranking SVM with configurable query normalization, cost sensitivity, and score normalization.
-- **IR evaluation metrics** -- NDCG, MAP, MRR, Precision@K, Recall@K, ERR, RBP, F-measure, R-Precision, Success@K. Binary and graded relevance.
-- **TREC format parsing** -- load standard TREC run files and qrels, batch evaluate, export CSV/JSON.
-- **Statistical testing** -- paired t-test, confidence intervals, Cohen's d effect size.
+- **Differentiable ranking**: sigmoid-based soft ranking $\hat{R}_i(\mathbf{s}) = \sum_{j \neq i} \sigma\bigl(\tau(s_j - s_i)\bigr)$. Variants: NeuralSort, SoftRank/Probabilistic, SmoothI. $O(n^2)$, suitable for lists up to ~1000 items.
+- **LTR loss functions**: RankNet, LambdaLoss, ApproxNDCG, ListNet, ListMLE (see formulas below).
+- **Gradient trainers**: LambdaRank and Ranking SVM with configurable query normalization, cost sensitivity, and score normalization.
+- **IR evaluation metrics**: NDCG, MAP, MRR, Precision@K, Recall@K, ERR, RBP, F-measure, R-Precision, Success@K. Binary and graded relevance.
+- **TREC format parsing**: load standard TREC run files and qrels, batch evaluate, export CSV/JSON.
+- **Statistical testing**: paired t-test, confidence intervals, Cohen's d effect size.
 
 ### Loss functions
 
@@ -71,16 +71,16 @@ requirements, and real sample output.
 
 `rankit` builds on [`fynch`](https://crates.io/crates/fynch) (Fenchel-Young losses, differentiable sorting primitives). Related crates:
 
-- [`rankfns`](https://crates.io/crates/rankfns) -- scoring functions (BM25, TF-IDF, DPH, language models)
-- [`rankops`](https://crates.io/crates/rankops) -- ranked list operations (RBO, Kendall tau, fusion, interleaving)
+- [`rankfns`](https://crates.io/crates/rankfns): scoring functions (BM25, TF-IDF, language models)
+- [`rankops`](https://crates.io/crates/rankops): rank fusion and reranking (RRF, CombMNZ, MMR, IR metrics)
 
 ## References
 
-- Burges et al. "Learning to Rank using Gradient Descent" (ICML 2005) -- RankNet
-- Qin & Liu. "A General Approximation Framework for Direct Optimization of Information Retrieval Measures" (2010) -- ApproxNDCG
-- Cao et al. "Learning to Rank: From Pairwise Approach to Listwise Approach" (ICML 2007) -- ListNet
-- Xia et al. "Listwise Approach to Learning to Rank" (ICML 2008) -- ListMLE
-- Blondel et al. "Fast Differentiable Sorting and Ranking" (ICML 2020) -- soft ranking methods
+- Burges et al. "Learning to Rank using Gradient Descent" (ICML 2005): RankNet
+- Qin & Liu. "A General Approximation Framework for Direct Optimization of Information Retrieval Measures" (2010): ApproxNDCG
+- Cao et al. "Learning to Rank: From Pairwise Approach to Listwise Approach" (ICML 2007): ListNet
+- Xia et al. "Listwise Approach to Learning to Rank" (ICML 2008): ListMLE
+- Blondel et al. "Fast Differentiable Sorting and Ranking" (ICML 2020): soft ranking methods
 
 ## License
 
