@@ -1,9 +1,9 @@
 //! Gumbel-Softmax sampling and relaxed top-k.
 //!
-//! Delegates to [`kuji`] for correct implementations of the Gumbel-Softmax
+//! Delegates to [`drawset`] for correct implementations of the Gumbel-Softmax
 //! trick and the iterated masked-softmax relaxed top-k (Kool et al., 2019).
 //!
-//! Requires the `gumbel` feature (enables `rand` + `kuji` dependencies).
+//! Requires the `gumbel` feature (enables `rand` + `drawset` dependencies).
 
 use rand::Rng;
 
@@ -23,7 +23,7 @@ pub fn gumbel_softmax(
     scale: f64,
     rng: &mut impl Rng,
 ) -> Vec<f64> {
-    kuji::gumbel_softmax(logits, temperature, scale, rng)
+    drawset::gumbel_softmax(logits, temperature, scale, rng)
 }
 
 /// Relaxed Top-k using iterated Gumbel-Softmax (Kool et al., 2019).
@@ -42,7 +42,7 @@ pub fn relaxed_topk_gumbel(
     scale: f64,
     rng: &mut impl Rng,
 ) -> Vec<f64> {
-    kuji::relaxed_topk_gumbel(scores, k, temperature, scale, rng)
+    drawset::relaxed_topk_gumbel(scores, k, temperature, scale, rng)
 }
 
 /// Generate Gumbel-based attention mask for RAG reranking.
