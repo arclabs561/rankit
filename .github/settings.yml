@@ -15,7 +15,10 @@ repository:
   delete_branch_on_merge: true
 
   topics:
-    - learning-to-rank
     - information-retrieval
+    - lambdarank
+    - learning-to-rank
     - machine-learning
+    - ndcg
+    - ranking
     - rust
