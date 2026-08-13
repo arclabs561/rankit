@@ -200,8 +200,16 @@ fn compute_delta_ndcg(
         return 0.0;
     }
 
-    let discount_i = 1.0 / (rank_i as f64 + 2.0).log2();
-    let discount_j = 1.0 / (rank_j as f64 + 2.0).log2();
+    let discount_i = if rank_i < k {
+        1.0 / (rank_i as f64 + 2.0).log2()
+    } else {
+        0.0
+    };
+    let discount_j = if rank_j < k {
+        1.0 / (rank_j as f64 + 2.0).log2()
+    } else {
+        0.0
+    };
 
     let gain_i = 2.0_f64.powf(rel_i) - 1.0;
     let gain_j = 2.0_f64.powf(rel_j) - 1.0;
@@ -441,6 +449,22 @@ mod tests {
         let expected = 2000.0 * (1.0 - 1.0 / 3.0_f64.log2());
         assert!(loss.is_finite());
         assert!((loss - expected).abs() < 1e-12);
+    }
+
+    #[test]
+    fn delta_ndcg_at_one_treats_ranks_below_cutoff_as_zero() {
+        let demotion = compute_delta_ndcg(1.0, 0.0, 0, 1, 1.0, 1);
+        let same_swap_with_reversed_arguments = compute_delta_ndcg(0.0, 1.0, 1, 0, 1.0, 1);
+        let promotion = compute_delta_ndcg(1.0, 0.0, 1, 0, 1.0, 1);
+
+        assert_eq!(demotion, -1.0);
+        assert_eq!(same_swap_with_reversed_arguments, demotion);
+        assert_eq!(promotion, -demotion);
+    }
+
+    #[test]
+    fn delta_ndcg_is_zero_when_both_ranks_are_below_cutoff() {
+        assert_eq!(compute_delta_ndcg(3.0, 0.0, 1, 2, 1.0, 1), 0.0);
     }
 
     #[test]
