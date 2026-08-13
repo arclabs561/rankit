@@ -3,6 +3,8 @@
 //! All metrics assume:
 //! - `ranked`: List of document IDs in ranked order (best first)
 //! - `relevant`: Set of relevant document IDs (ground truth)
+//!
+//! Repeated document IDs in `ranked` are ignored after their first occurrence.
 
 use std::collections::HashSet;
 
@@ -29,9 +31,13 @@ impl DegradationMetrics {
     }
 }
 
+fn unique_ranked<I: Eq + std::hash::Hash>(ranked: &[I]) -> impl Iterator<Item = &I> {
+    let mut seen = HashSet::with_capacity(ranked.len());
+    ranked.iter().filter(move |id| seen.insert(*id))
+}
+
 fn extract_ranks<I: Eq + std::hash::Hash>(ranked: &[I], relevant: &HashSet<I>) -> Vec<usize> {
-    ranked
-        .iter()
+    unique_ranked(ranked)
         .enumerate()
         .filter(|(_, id)| relevant.contains(id))
         .map(|(i, _)| i + 1)
@@ -70,8 +76,7 @@ pub fn mrr<I: Eq + std::hash::Hash>(ranked: &[I], relevant: &HashSet<I>) -> f64 
 
 /// Discounted Cumulative Gain at k.
 pub fn dcg_at_k<I: Eq + std::hash::Hash>(ranked: &[I], relevant: &HashSet<I>, k: usize) -> f64 {
-    let relevance: Vec<f64> = ranked
-        .iter()
+    let relevance: Vec<f64> = unique_ranked(ranked)
         .take(k)
         .map(|id| if relevant.contains(id) { 1.0 } else { 0.0 })
         .collect();
@@ -88,8 +93,7 @@ pub fn idcg_at_k(n_relevant: usize, k: usize) -> f64 {
 
 /// Normalized DCG at k.
 pub fn ndcg_at_k<I: Eq + std::hash::Hash>(ranked: &[I], relevant: &HashSet<I>, k: usize) -> f64 {
-    let relevance: Vec<f64> = ranked
-        .iter()
+    let relevance: Vec<f64> = unique_ranked(ranked)
         .take(k)
         .map(|id| if relevant.contains(id) { 1.0 } else { 0.0 })
         .collect();
@@ -269,5 +273,48 @@ mod tests {
         assert!((success_at_k(&ranked, &relevant, 3) - 1.0).abs() < 1e-9);
         // And 0.0 when no relevant doc is in the top-k.
         assert!(success_at_k(&ranked, &relevant, 1).abs() < 1e-9);
+    }
+
+    #[test]
+    fn duplicate_results_match_first_occurrences_for_every_metric() {
+        let duplicated = vec!["a", "a", "b", "c", "c", "d"];
+        let deduplicated = vec!["a", "b", "c", "d"];
+        let relevant: HashSet<_> = ["a", "c"].into_iter().collect();
+
+        let duplicated_scores = [
+            precision_at_k(&duplicated, &relevant, 3),
+            recall_at_k(&duplicated, &relevant, 3),
+            mrr(&duplicated, &relevant),
+            dcg_at_k(&duplicated, &relevant, 3),
+            ndcg_at_k(&duplicated, &relevant, 3),
+            average_precision(&duplicated, &relevant),
+            err_at_k(&duplicated, &relevant, 3),
+            rbp_at_k(&duplicated, &relevant, 3, 0.8),
+            f_measure_at_k(&duplicated, &relevant, 3, 1.0),
+            success_at_k(&duplicated, &relevant, 3),
+            r_precision(&duplicated, &relevant),
+        ];
+        let deduplicated_scores = [
+            precision_at_k(&deduplicated, &relevant, 3),
+            recall_at_k(&deduplicated, &relevant, 3),
+            mrr(&deduplicated, &relevant),
+            dcg_at_k(&deduplicated, &relevant, 3),
+            ndcg_at_k(&deduplicated, &relevant, 3),
+            average_precision(&deduplicated, &relevant),
+            err_at_k(&deduplicated, &relevant, 3),
+            rbp_at_k(&deduplicated, &relevant, 3, 0.8),
+            f_measure_at_k(&deduplicated, &relevant, 3, 1.0),
+            success_at_k(&deduplicated, &relevant, 3),
+            r_precision(&deduplicated, &relevant),
+        ];
+
+        assert_eq!(duplicated_scores, deduplicated_scores);
+        // DCG is an unnormalized cumulative gain and is not bounded by one.
+        assert!(duplicated_scores
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| *index != 3)
+            .map(|(_, score)| score)
+            .all(|score| (0.0..=1.0).contains(score)));
     }
 }

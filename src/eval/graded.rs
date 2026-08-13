@@ -1,8 +1,16 @@
 //! Graded relevance IR evaluation metrics.
 //!
 //! These metrics use actual relevance scores (not just binary) in calculations.
+//! Repeated document IDs are ignored after their first occurrence.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+
+fn unique_ranked(ranked: &[(String, f32)]) -> impl Iterator<Item = &(String, f32)> {
+    let mut seen = HashSet::with_capacity(ranked.len());
+    ranked
+        .iter()
+        .filter(move |(doc_id, _)| seen.insert(doc_id.as_str()))
+}
 
 /// Compute nDCG@k for graded relevance.
 ///
@@ -10,8 +18,7 @@ use std::collections::HashMap;
 ///
 /// Reference: Jarvelin & Kekalainen (2002)
 pub fn compute_ndcg(ranked: &[(String, f32)], qrels: &HashMap<String, u32>, k: usize) -> f64 {
-    let relevance: Vec<f64> = ranked
-        .iter()
+    let relevance: Vec<f64> = unique_ranked(ranked)
         .take(k)
         .map(|(doc_id, _)| qrels.get(doc_id).copied().unwrap_or(0) as f64)
         .collect();
@@ -37,8 +44,7 @@ pub fn compute_map(ranked: &[(String, f32)], qrels: &HashMap<String, u32>) -> f6
         return 0.0;
     }
 
-    let ranks: Vec<usize> = ranked
-        .iter()
+    let ranks: Vec<usize> = unique_ranked(ranked)
         .enumerate()
         .filter(|(_, (doc_id, _))| qrels.get(doc_id).copied().unwrap_or(0) > 0)
         .map(|(i, _)| i + 1)
@@ -82,5 +88,36 @@ mod tests {
 
         let map = compute_map(&ranked, &qrels);
         assert!((map - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn duplicate_results_match_first_occurrences_and_stay_bounded() {
+        let duplicated = vec![
+            ("doc1".to_string(), 0.9),
+            ("doc1".to_string(), 0.8),
+            ("other".to_string(), 0.7),
+            ("doc2".to_string(), 0.6),
+            ("doc2".to_string(), 0.5),
+        ];
+        let deduplicated = vec![
+            ("doc1".to_string(), 0.9),
+            ("other".to_string(), 0.7),
+            ("doc2".to_string(), 0.6),
+        ];
+        let qrels = HashMap::from([("doc1".to_string(), 2), ("doc2".to_string(), 1)]);
+
+        let duplicate_scores = [
+            compute_ndcg(&duplicated, &qrels, 3),
+            compute_map(&duplicated, &qrels),
+        ];
+        let deduplicated_scores = [
+            compute_ndcg(&deduplicated, &qrels, 3),
+            compute_map(&deduplicated, &qrels),
+        ];
+
+        assert_eq!(duplicate_scores, deduplicated_scores);
+        assert!(duplicate_scores
+            .iter()
+            .all(|score| (0.0..=1.0).contains(score)));
     }
 }
