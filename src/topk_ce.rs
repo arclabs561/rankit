@@ -23,14 +23,19 @@
 //!     temperature: 2.0,
 //!     m: Some(8), // only sort top-8 scores for efficiency
 //! };
-//! let loss_fn = TopKCrossEntropyLoss::new(config);
+//! let loss_fn = TopKCrossEntropyLoss::try_new(config)?;
 //!
 //! // logits for 10 classes, true label is class 3
 //! let logits = vec![0.1, 0.2, 0.5, 2.0, 0.3, 0.1, 0.05, 0.02, 0.4, 0.15];
 //! let label = 3;
 //! let loss = loss_fn.compute(&logits, label);
 //! assert!(loss >= 0.0);
+//! # Ok::<(), rankit::topk_ce::TopKConfigError>(())
 //! ```
+
+use thiserror::Error;
+
+const PROBABILITY_SUM_TOLERANCE: f64 = 1e-12;
 
 /// Configuration for the top-k cross-entropy loss.
 #[derive(Debug, Clone)]
@@ -56,6 +61,114 @@ impl Default for TopKConfig {
     }
 }
 
+impl TopKConfig {
+    /// Validate the probability distribution, temperature, and truncation.
+    pub fn validate(&self) -> Result<(), TopKConfigError> {
+        if self.p_k.is_empty() {
+            return Err(TopKConfigError::EmptyDistribution);
+        }
+
+        for (index, &probability) in self.p_k.iter().enumerate() {
+            if !probability.is_finite() {
+                return Err(TopKConfigError::NonFiniteProbability { index, probability });
+            }
+            if probability < 0.0 {
+                return Err(TopKConfigError::NegativeProbability { index, probability });
+            }
+        }
+
+        let sum: f64 = self.p_k.iter().sum();
+        if (sum - 1.0).abs() > PROBABILITY_SUM_TOLERANCE {
+            return Err(TopKConfigError::NonNormalizedDistribution { sum });
+        }
+
+        if !self.temperature.is_finite() || self.temperature <= 0.0 {
+            return Err(TopKConfigError::InvalidTemperature(self.temperature));
+        }
+
+        if let Some(m) = self.m {
+            if m < self.p_k.len() {
+                return Err(TopKConfigError::InvalidTruncation {
+                    m,
+                    k: self.p_k.len(),
+                });
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// Invalid top-k cross-entropy configuration.
+#[derive(Debug, Clone, Error, PartialEq)]
+#[non_exhaustive]
+pub enum TopKConfigError {
+    /// The distribution contains no top-k positions.
+    #[error("p_k must not be empty")]
+    EmptyDistribution,
+    /// A distribution entry is NaN or infinite.
+    #[error("p_k[{index}] must be finite, got {probability}")]
+    NonFiniteProbability {
+        /// Index of the invalid entry.
+        index: usize,
+        /// Invalid probability.
+        probability: f64,
+    },
+    /// A distribution entry is negative.
+    #[error("p_k[{index}] must be non-negative, got {probability}")]
+    NegativeProbability {
+        /// Index of the invalid entry.
+        index: usize,
+        /// Invalid probability.
+        probability: f64,
+    },
+    /// The distribution does not sum to one.
+    #[error("p_k must sum to 1 (within {PROBABILITY_SUM_TOLERANCE}), got {sum}")]
+    NonNormalizedDistribution {
+        /// Observed sum.
+        sum: f64,
+    },
+    /// The smoothing temperature is not finite and strictly positive.
+    #[error("temperature must be finite and greater than zero, got {0}")]
+    InvalidTemperature(f64),
+    /// The top-m truncation is smaller than the largest requested k.
+    #[error("m must be at least the number of p_k entries ({k}), got {m}")]
+    InvalidTruncation {
+        /// Requested truncation.
+        m: usize,
+        /// Number of top-k positions.
+        k: usize,
+    },
+}
+
+/// Invalid input to a top-k cross-entropy computation.
+#[derive(Debug, Clone, Error, PartialEq)]
+#[non_exhaustive]
+pub enum TopKComputeError {
+    /// The loss was created with an invalid configuration.
+    #[error(transparent)]
+    InvalidConfig(#[from] TopKConfigError),
+    /// A sample has no class logits.
+    #[error("logits must not be empty")]
+    EmptyLogits,
+    /// The label does not identify one of the sample's classes.
+    #[error("label {label} is out of bounds for {classes} classes")]
+    LabelOutOfBounds {
+        /// Invalid label.
+        label: usize,
+        /// Number of available classes.
+        classes: usize,
+    },
+    /// The number of samples and labels differs.
+    #[error("logits batch length ({samples}) does not match labels length ({labels})")]
+    BatchLengthMismatch {
+        /// Number of samples.
+        samples: usize,
+        /// Number of labels.
+        labels: usize,
+    },
+}
+
 /// Top-k cross-entropy loss.
 ///
 /// Computes a weighted mixture of cross-entropy losses at different top-k
@@ -66,9 +179,18 @@ pub struct TopKCrossEntropyLoss {
 }
 
 impl TopKCrossEntropyLoss {
-    /// Create a new loss function with the given configuration.
+    /// Create a loss without validating its configuration.
+    ///
+    /// This compatibility constructor preserves the original API. Prefer
+    /// [`Self::try_new`] when configuration can come from user input.
     pub fn new(config: TopKConfig) -> Self {
         Self { config }
+    }
+
+    /// Create a loss after validating its configuration.
+    pub fn try_new(config: TopKConfig) -> Result<Self, TopKConfigError> {
+        config.validate()?;
+        Ok(Self { config })
     }
 
     /// Standard top-1 cross-entropy (equivalent to softmax CE).
@@ -80,6 +202,16 @@ impl TopKCrossEntropyLoss {
     pub fn uniform(k: usize, temperature: f64) -> Self {
         let weight = 1.0 / k as f64;
         Self::new(TopKConfig {
+            p_k: vec![weight; k],
+            temperature,
+            m: None,
+        })
+    }
+
+    /// Create a validated loss with equal weight across `k` positions.
+    pub fn try_uniform(k: usize, temperature: f64) -> Result<Self, TopKConfigError> {
+        let weight = 1.0 / k as f64;
+        Self::try_new(TopKConfig {
             p_k: vec![weight; k],
             temperature,
             m: None,
@@ -100,6 +232,21 @@ impl TopKCrossEntropyLoss {
         })
     }
 
+    /// Create a validated loss emphasizing top-1 and top-k equally.
+    pub fn try_endpoints(k: usize, temperature: f64) -> Result<Self, TopKConfigError> {
+        if k == 0 {
+            return Err(TopKConfigError::EmptyDistribution);
+        }
+        let mut p_k = vec![0.0; k];
+        p_k[0] = 0.5;
+        p_k[k - 1] += 0.5;
+        Self::try_new(TopKConfig {
+            p_k,
+            temperature,
+            m: None,
+        })
+    }
+
     /// Compute the loss for a single sample.
     ///
     /// # Arguments
@@ -110,6 +257,10 @@ impl TopKCrossEntropyLoss {
     /// # Returns
     ///
     /// Non-negative loss value.
+    ///
+    /// For compatibility, empty logits or an out-of-range label return `0.0`,
+    /// and this method does not validate the configuration. Use
+    /// [`Self::try_compute`] when those cases should be errors.
     pub fn compute(&self, logits: &[f64], label: usize) -> f64 {
         let n = logits.len();
         if n == 0 || label >= n {
@@ -170,7 +321,26 @@ impl TopKCrossEntropyLoss {
         loss
     }
 
+    /// Compute the loss for one sample after validating configuration and input.
+    pub fn try_compute(&self, logits: &[f64], label: usize) -> Result<f64, TopKComputeError> {
+        self.config.validate()?;
+        if logits.is_empty() {
+            return Err(TopKComputeError::EmptyLogits);
+        }
+        if label >= logits.len() {
+            return Err(TopKComputeError::LabelOutOfBounds {
+                label,
+                classes: logits.len(),
+            });
+        }
+        Ok(self.compute(logits, label))
+    }
+
     /// Compute the loss for a batch of samples, returning the mean.
+    ///
+    /// For compatibility, this method processes the shared prefix when batch
+    /// and label lengths differ. Use [`Self::try_compute_batch`] to reject a
+    /// mismatch.
     pub fn compute_batch(&self, logits_batch: &[Vec<f64>], labels: &[usize]) -> f64 {
         if logits_batch.is_empty() {
             return 0.0;
@@ -181,6 +351,32 @@ impl TopKCrossEntropyLoss {
             .map(|(logits, &label)| self.compute(logits, label))
             .sum();
         total / logits_batch.len() as f64
+    }
+
+    /// Compute the mean batch loss after validating configuration and inputs.
+    pub fn try_compute_batch(
+        &self,
+        logits_batch: &[Vec<f64>],
+        labels: &[usize],
+    ) -> Result<f64, TopKComputeError> {
+        self.config.validate()?;
+        if logits_batch.len() != labels.len() {
+            return Err(TopKComputeError::BatchLengthMismatch {
+                samples: logits_batch.len(),
+                labels: labels.len(),
+            });
+        }
+        if logits_batch.is_empty() {
+            return Ok(0.0);
+        }
+
+        let total = logits_batch
+            .iter()
+            .zip(labels)
+            .try_fold(0.0, |total, (logits, &label)| {
+                self.try_compute(logits, label).map(|loss| total + loss)
+            })?;
+        Ok(total / logits_batch.len() as f64)
     }
 }
 
@@ -382,5 +578,169 @@ mod tests {
         // Both should be valid
         assert!(l_sharp.is_finite());
         assert!(l_smooth.is_finite());
+    }
+
+    #[test]
+    fn validated_constructor_accepts_default_config() {
+        assert!(TopKCrossEntropyLoss::try_new(TopKConfig::default()).is_ok());
+        assert_eq!(
+            TopKCrossEntropyLoss::try_uniform(0, 1.0).unwrap_err(),
+            TopKConfigError::EmptyDistribution
+        );
+        assert_eq!(
+            TopKCrossEntropyLoss::try_endpoints(0, 1.0).unwrap_err(),
+            TopKConfigError::EmptyDistribution
+        );
+        assert!(TopKCrossEntropyLoss::try_endpoints(1, 1.0).is_ok());
+    }
+
+    #[test]
+    fn config_rejects_empty_distribution() {
+        let error = TopKConfig {
+            p_k: vec![],
+            temperature: 1.0,
+            m: None,
+        }
+        .validate()
+        .unwrap_err();
+        assert_eq!(error, TopKConfigError::EmptyDistribution);
+    }
+
+    #[test]
+    fn config_rejects_non_finite_and_negative_probabilities() {
+        let non_finite = TopKConfig {
+            p_k: vec![f64::NAN],
+            temperature: 1.0,
+            m: None,
+        }
+        .validate()
+        .unwrap_err();
+        assert!(matches!(
+            non_finite,
+            TopKConfigError::NonFiniteProbability { index: 0, probability }
+                if probability.is_nan()
+        ));
+
+        let negative = TopKConfig {
+            p_k: vec![1.1, -0.1],
+            temperature: 1.0,
+            m: None,
+        }
+        .validate()
+        .unwrap_err();
+        assert_eq!(
+            negative,
+            TopKConfigError::NegativeProbability {
+                index: 1,
+                probability: -0.1,
+            }
+        );
+    }
+
+    #[test]
+    fn config_rejects_non_normalized_distribution() {
+        let error = TopKConfig {
+            p_k: vec![0.25, 0.25],
+            temperature: 1.0,
+            m: None,
+        }
+        .validate()
+        .unwrap_err();
+        assert_eq!(
+            error,
+            TopKConfigError::NonNormalizedDistribution { sum: 0.5 }
+        );
+    }
+
+    #[test]
+    fn config_rejects_invalid_temperature_and_m() {
+        for temperature in [0.0, -1.0, f64::INFINITY, f64::NAN] {
+            let error = TopKConfig {
+                p_k: vec![1.0],
+                temperature,
+                m: None,
+            }
+            .validate()
+            .unwrap_err();
+            assert!(matches!(error, TopKConfigError::InvalidTemperature(value)
+                if value == temperature || (value.is_nan() && temperature.is_nan())));
+        }
+
+        let error = TopKConfig {
+            p_k: vec![0.5, 0.5],
+            temperature: 1.0,
+            m: Some(1),
+        }
+        .validate()
+        .unwrap_err();
+        assert_eq!(error, TopKConfigError::InvalidTruncation { m: 1, k: 2 });
+    }
+
+    #[test]
+    fn checked_compute_rejects_empty_logits_and_invalid_label() {
+        let loss = TopKCrossEntropyLoss::top1();
+        assert_eq!(loss.try_compute(&[], 0), Err(TopKComputeError::EmptyLogits));
+        assert_eq!(
+            loss.try_compute(&[1.0, 2.0], 2),
+            Err(TopKComputeError::LabelOutOfBounds {
+                label: 2,
+                classes: 2,
+            })
+        );
+    }
+
+    #[test]
+    fn checked_compute_rejects_compatibility_constructed_invalid_config() {
+        let loss = TopKCrossEntropyLoss::new(TopKConfig {
+            p_k: vec![0.25],
+            temperature: 1.0,
+            m: None,
+        });
+        assert_eq!(
+            loss.try_compute(&[1.0], 0),
+            Err(TopKComputeError::InvalidConfig(
+                TopKConfigError::NonNormalizedDistribution { sum: 0.25 }
+            ))
+        );
+    }
+
+    #[test]
+    fn checked_batch_rejects_length_and_sample_mismatches() {
+        let loss = TopKCrossEntropyLoss::top1();
+        assert_eq!(
+            loss.try_compute_batch(&[vec![1.0, 2.0]], &[]),
+            Err(TopKComputeError::BatchLengthMismatch {
+                samples: 1,
+                labels: 0,
+            })
+        );
+        assert_eq!(
+            loss.try_compute_batch(&[vec![1.0]], &[1]),
+            Err(TopKComputeError::LabelOutOfBounds {
+                label: 1,
+                classes: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn checked_and_compatibility_computations_agree_for_valid_inputs() {
+        let loss = TopKCrossEntropyLoss::try_new(TopKConfig {
+            p_k: vec![0.5, 0.5],
+            temperature: 1.0,
+            m: Some(2),
+        })
+        .unwrap();
+        let logits = vec![vec![2.0, 1.0], vec![0.5, 1.5]];
+        let labels = vec![0, 1];
+
+        assert_eq!(
+            loss.try_compute(&logits[0], labels[0]).unwrap(),
+            loss.compute(&logits[0], labels[0])
+        );
+        assert_eq!(
+            loss.try_compute_batch(&logits, &labels).unwrap(),
+            loss.compute_batch(&logits, &labels)
+        );
     }
 }
