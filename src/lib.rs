@@ -43,6 +43,9 @@
 /// Differentiable ranking operations (sigmoid-based, O(n^2)).
 pub mod rank;
 
+/// Matrix-valued NeuralSort and SoftSort operators.
+pub mod sorting;
+
 /// Ranking heuristics inspired by published methods.
 pub mod methods;
 
@@ -92,6 +95,7 @@ pub use methods::{
 };
 pub use optimized::{soft_rank_gradient_sparse, soft_rank_optimized};
 pub use rank::soft_rank;
+pub use sorting::{neural_sort, neural_sort_ranks, soft_sort, soft_sort_ranks, SortingError};
 pub use topk::differentiable_topk;
 
 #[cfg(feature = "parallel")]

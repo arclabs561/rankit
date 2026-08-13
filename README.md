@@ -8,6 +8,7 @@ Learning-to-rank losses and evaluation.
 ## What it does
 
 - **Differentiable ranking**: sigmoid-based soft ranking $\hat{R}_i(\mathbf{s}) = \sum_{j \neq i} \sigma\bigl(\tau(s_j - s_i)\bigr)$. Additional variants are lightweight heuristics inspired by NeuralSort, probabilistic ranking, and SmoothI. They are $O(n^2)$.
+- **Sorting relaxations**: `neural_sort` and `soft_sort` return row-stochastic matrices following the published NeuralSort and SoftSort formulas; expected-rank adapters are also provided.
 - **LTR objectives**: RankNet, an NDCG-weighted pairwise loss, ApproxNDCG, top-one ListNet, and a ListMLE-inspired objective (see formulas below).
 - **Gradient trainers**: LambdaRank and Ranking SVM with configurable query normalization, cost sensitivity, and score normalization.
 - **IR evaluation metrics**: NDCG, MAP, MRR, Precision@K, Recall@K, ERR, RBP, F-measure, R-Precision, Success@K. Binary and graded relevance.
@@ -80,6 +81,8 @@ requirements, and real sample output.
 - Cao et al. "Learning to Rank: From Pairwise Approach to Listwise Approach" (ICML 2007): ListNet
 - Xia et al. "Listwise Approach to Learning to Rank" (ICML 2008): ListMLE
 - Blondel et al. "Fast Differentiable Sorting and Ranking" (ICML 2020): soft ranking methods
+- Grover et al. "Stochastic Optimization of Sorting Networks via Continuous Relaxations" (ICLR 2019): NeuralSort
+- Prillo & Eisenschlos. "SoftSort: A Continuous Relaxation for the argsort Operator" (ICML 2020): SoftSort
 
 ## License
 
