@@ -705,16 +705,17 @@ fn confidence_interval_py(scores: &Bound<'_, PyAny>, confidence: f64) -> PyResul
     Ok(statistics::confidence_interval(&s, confidence))
 }
 
-/// Cohen's d effect size between two sets of scores.
+/// Cohen's paired-samples effect size (`d_z`) between two score sets.
 ///
-/// Interpretation: |d| < 0.2 negligible, 0.2-0.5 small, 0.5-0.8 medium, >= 0.8 large.
+/// Returns NaN when the paired differences have zero mean and zero variance,
+/// and signed infinity for a constant nonzero difference.
 ///
 /// Args:
 ///     scores_a: 1D array of scores from method A.
 ///     scores_b: 1D array of scores from method B.
 ///
 /// Returns:
-///     Effect size (positive means A > B).
+///     Paired effect size (positive means A > B).
 ///
 /// Raises:
 ///     ValueError: If inputs have different lengths.

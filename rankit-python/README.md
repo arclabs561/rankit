@@ -60,7 +60,7 @@ score = ranklab.ndcg(ranked, qrels, k=3)
 | `average_precision` | Average Precision for binary relevance |
 | `paired_t_test` | Paired t-test on two score sets, returns dict |
 | `confidence_interval` | Confidence interval for a score set |
-| `cohens_d` | Cohen's d effect size |
+| `cohens_d` | Paired-samples Cohen's d_z effect size |
 | `load_trec_run` | Parse a TREC run file into {query_id: [(doc_id, score)]} |
 | `load_qrels` | Parse a TREC qrels file into {query_id: {doc_id: rel}} |
 | `evaluate_batch` | Batch evaluation across multiple queries |

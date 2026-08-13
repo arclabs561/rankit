@@ -1,5 +1,7 @@
 """Tests for ranklab Python bindings."""
 
+import math
+
 import numpy as np
 import pytest
 import ranklab
@@ -445,7 +447,11 @@ class TestStatistics:
     def test_cohens_d_identical(self):
         a = [0.5, 0.6, 0.7]
         d = ranklab.cohens_d(a, a)
-        assert abs(d) < 1e-9
+        assert math.isnan(d)
+
+    def test_cohens_d_constant_nonzero_difference(self):
+        d = ranklab.cohens_d([2.0, 2.0], [1.0, 1.0])
+        assert d == math.inf
 
     def test_cohens_d_numpy(self):
         a = np.array([0.5, 0.6, 0.7])
