@@ -45,11 +45,23 @@ class TestSoftRank:
 
 
 class TestSoftRankVariants:
-    def test_neural_sort_numpy(self):
+    def test_legacy_neural_sort_name_is_pairwise_logistic(self):
         scores = np.array([3.0, 1.0, 2.0])
-        ranks = ranklab.soft_rank_neural_sort(scores, temperature=1.0)
-        assert isinstance(ranks, np.ndarray)
-        assert len(ranks) == 3
+        legacy = ranklab.soft_rank_neural_sort(scores, temperature=1.0)
+        canonical = ranklab.pairwise_logistic_rank(scores, temperature=1.0)
+        np.testing.assert_array_equal(legacy, canonical)
+
+    @pytest.mark.parametrize("operator", [ranklab.neural_sort, ranklab.soft_sort])
+    def test_exact_sorting_matrices_are_row_stochastic(self, operator):
+        matrix = operator([3.0, 1.0, 2.0], temperature=0.5)
+        assert matrix.shape == (3, 3)
+        np.testing.assert_allclose(matrix.sum(axis=1), np.ones(3), atol=1e-12)
+        np.testing.assert_array_equal(matrix.argmax(axis=1), [0, 2, 1])
+
+    @pytest.mark.parametrize("operator", [ranklab.neural_sort, ranklab.soft_sort])
+    def test_exact_sorting_rejects_invalid_temperature(self, operator):
+        with pytest.raises(ValueError, match="temperature must be finite"):
+            operator([3.0, 1.0, 2.0], temperature=0.0)
 
     def test_sigmoid_numpy(self):
         scores = np.array([3.0, 1.0, 2.0])
@@ -297,7 +309,13 @@ class TestAdditionalBinaryMetrics:
     """Tests for ERR, RBP, F-measure, Success@k, R-Precision, Average Precision."""
 
     def _make_data(self):
-        ranked = [("doc1", 0.9), ("doc2", 0.8), ("doc3", 0.7), ("doc4", 0.6), ("doc5", 0.5)]
+        ranked = [
+            ("doc1", 0.9),
+            ("doc2", 0.8),
+            ("doc3", 0.7),
+            ("doc4", 0.6),
+            ("doc5", 0.5),
+        ]
         qrels = {"doc1": 1, "doc3": 1, "doc5": 1}
         return ranked, qrels
 
@@ -444,9 +462,7 @@ class TestTrecIO:
     def test_load_trec_run(self, tmp_path):
         run_file = tmp_path / "run.txt"
         run_file.write_text(
-            "1 Q0 doc1 1 0.9 run1\n"
-            "1 Q0 doc2 2 0.8 run1\n"
-            "2 Q0 doc3 1 0.95 run1\n"
+            "1 Q0 doc1 1 0.9 run1\n1 Q0 doc2 2 0.8 run1\n2 Q0 doc3 1 0.95 run1\n"
         )
         result = ranklab.load_trec_run(str(run_file))
         assert "1" in result
@@ -457,11 +473,7 @@ class TestTrecIO:
 
     def test_load_qrels(self, tmp_path):
         qrels_file = tmp_path / "qrels.txt"
-        qrels_file.write_text(
-            "1 0 doc1 2\n"
-            "1 0 doc2 1\n"
-            "2 0 doc3 0\n"
-        )
+        qrels_file.write_text("1 0 doc1 2\n1 0 doc2 1\n2 0 doc3 0\n")
         result = ranklab.load_qrels(str(qrels_file))
         assert "1" in result
         assert result["1"]["doc1"] == 2
@@ -506,16 +518,10 @@ class TestBatchEvaluation:
     def test_evaluate_trec(self, tmp_path):
         run_file = tmp_path / "run.txt"
         run_file.write_text(
-            "q1 Q0 doc1 1 0.9 run1\n"
-            "q1 Q0 doc2 2 0.8 run1\n"
-            "q1 Q0 doc3 3 0.7 run1\n"
+            "q1 Q0 doc1 1 0.9 run1\nq1 Q0 doc2 2 0.8 run1\nq1 Q0 doc3 3 0.7 run1\n"
         )
         qrels_file = tmp_path / "qrels.txt"
-        qrels_file.write_text(
-            "q1 0 doc1 2\n"
-            "q1 0 doc2 0\n"
-            "q1 0 doc3 1\n"
-        )
+        qrels_file.write_text("q1 0 doc1 2\nq1 0 doc2 0\nq1 0 doc3 1\n")
         result = ranklab.evaluate_trec(
             str(run_file), str(qrels_file), ["ndcg@10", "mrr"]
         )

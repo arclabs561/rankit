@@ -2,12 +2,11 @@
 //!
 //! Each method has O(n^2) complexity and normalizes to [0, n-1] range.
 //!
-//! | Method | Best For |
-//! |--------|----------|
-//! | **Sigmoid** | General use (default) |
-//! | **NeuralSort** | NeuralSort-style scores |
-//! | **Probabilistic** | Probabilistic-style rank scores |
-//! | **SmoothI** | Alternative gradient profiles |
+//! The sigmoid implementation is the default.
+//!
+//! The paper-named functions and [`RankingMethod`] variants are retained for
+//! compatibility. They are pairwise heuristics, not implementations of the
+//! matrix-valued operators in [`crate::sorting`].
 
 use crate::rank::sigmoid;
 
@@ -51,10 +50,11 @@ pub fn soft_rank_sigmoid(values: &[f64], regularization_strength: f64) -> Vec<f6
     ranks
 }
 
-/// NeuralSort-inspired ranking using temperature-scaled softmax.
+/// Pairwise logistic soft ranks parameterized by smoothing temperature.
 ///
-/// From: "NeuralSort: A Differentiable Sorting Operator" (Grover et al., ICML 2019)
-pub fn soft_rank_neural_sort(values: &[f64], temperature: f64) -> Vec<f64> {
+/// Lower positive temperatures produce sharper pairwise comparisons. This is
+/// a scalar-rank heuristic; use [`crate::neural_sort`] for NeuralSort.
+pub fn pairwise_logistic_rank(values: &[f64], temperature: f64) -> Vec<f64> {
     let n = values.len();
     if n == 0 {
         return vec![];
@@ -92,10 +92,18 @@ pub fn soft_rank_neural_sort(values: &[f64], temperature: f64) -> Vec<f64> {
     ranks
 }
 
-/// SoftRank probabilistic approach using Gaussian smoothing.
+/// Compatibility name for [`pairwise_logistic_rank`].
 ///
-/// From: "SoftRank: Optimizing Non-Smooth Rank Metrics" (Taylor et al., WSDM 2008)
-pub fn soft_rank_probabilistic(values: &[f64], sigma: f64) -> Vec<f64> {
+/// Despite its historical name, this does not implement NeuralSort.
+pub fn soft_rank_neural_sort(values: &[f64], temperature: f64) -> Vec<f64> {
+    pairwise_logistic_rank(values, temperature)
+}
+
+/// Pairwise logistic approximation to Gaussian-smoothed ranks.
+///
+/// This uses a scaled logistic CDF in place of the normal CDF. It is not the
+/// exact Gaussian SoftRank operator of Taylor et al.
+pub fn logistic_gaussian_rank_approximation(values: &[f64], sigma: f64) -> Vec<f64> {
     let n = values.len();
     if n == 0 {
         return vec![];
@@ -135,44 +143,16 @@ pub fn soft_rank_probabilistic(values: &[f64], sigma: f64) -> Vec<f64> {
     ranks
 }
 
-/// SmoothI-style smooth rank indicators with exponential scaling.
+/// Compatibility name for [`logistic_gaussian_rank_approximation`].
+pub fn soft_rank_probabilistic(values: &[f64], sigma: f64) -> Vec<f64> {
+    logistic_gaussian_rank_approximation(values, sigma)
+}
+
+/// Compatibility name for [`soft_rank_sigmoid`].
 ///
-/// From: "SmoothI: Smooth Rank Indicators for Differentiable Ranking" (ICML 2021)
+/// Despite its historical name, this does not implement SmoothI.
 pub fn soft_rank_smooth_i(values: &[f64], alpha: f64) -> Vec<f64> {
-    let n = values.len();
-    if n == 0 {
-        return vec![];
-    }
-    if n == 1 {
-        return vec![0.0];
-    }
-
-    let mut ranks = vec![0.0; n];
-
-    for i in 0..n {
-        if !values[i].is_finite() {
-            ranks[i] = f64::NAN;
-            continue;
-        }
-
-        let mut sum = 0.0;
-        let mut valid_comparisons = 0;
-        for j in 0..n {
-            if i != j && values[j].is_finite() {
-                let diff = values[i] - values[j];
-                sum += sigmoid(alpha * diff);
-                valid_comparisons += 1;
-            }
-        }
-
-        if valid_comparisons > 0 {
-            ranks[i] = sum / valid_comparisons as f64 * (n - 1) as f64;
-        } else {
-            ranks[i] = 0.0;
-        }
-    }
-
-    ranks
+    soft_rank_sigmoid(values, alpha)
 }
 
 /// Enum for selecting ranking method.
@@ -180,11 +160,11 @@ pub fn soft_rank_smooth_i(values: &[f64], alpha: f64) -> Vec<f64> {
 pub enum RankingMethod {
     /// Sigmoid-based (default).
     Sigmoid,
-    /// NeuralSort-style (temperature-scaled softmax).
+    /// Compatibility variant for [`pairwise_logistic_rank`], not NeuralSort.
     NeuralSort,
-    /// SoftRank probabilistic (Gaussian smoothing).
+    /// Compatibility variant for [`logistic_gaussian_rank_approximation`].
     Probabilistic,
-    /// SmoothI (smooth rank indicators).
+    /// Compatibility variant for [`soft_rank_sigmoid`], not SmoothI.
     SmoothI,
 }
 
@@ -215,21 +195,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_all_methods_preserve_ordering() {
+    fn compatibility_names_have_exact_algebraic_identities() {
         let values = vec![5.0, 1.0, 2.0, 4.0, 3.0];
-
-        for method in [
-            RankingMethod::Sigmoid,
-            RankingMethod::NeuralSort,
-            RankingMethod::Probabilistic,
-            RankingMethod::SmoothI,
-        ] {
-            let ranks = method.compute(&values, 1.0);
-
-            assert!(ranks[1] < ranks[2], "{} failed ordering", method.name());
-            assert!(ranks[2] < ranks[4], "{} failed ordering", method.name());
-            assert!(ranks[4] < ranks[3], "{} failed ordering", method.name());
-            assert!(ranks[3] < ranks[0], "{} failed ordering", method.name());
-        }
+        assert_eq!(
+            soft_rank_neural_sort(&values, 0.7),
+            pairwise_logistic_rank(&values, 0.7)
+        );
+        assert_eq!(
+            soft_rank_probabilistic(&values, 0.7),
+            logistic_gaussian_rank_approximation(&values, 0.7)
+        );
+        assert_eq!(
+            soft_rank_smooth_i(&values, 0.7),
+            soft_rank_sigmoid(&values, 0.7)
+        );
+        assert_eq!(
+            RankingMethod::NeuralSort.compute(&values, 0.7),
+            pairwise_logistic_rank(&values, 0.7)
+        );
     }
 }

@@ -19,14 +19,14 @@ _Scores = Union[NDArray[np.floating], List[float]]
 # ---------------------------------------------------------------------------
 
 def soft_rank(scores: _Scores, temperature: float = 1.0) -> NDArray[np.float64]:
-    """Differentiable soft ranking using optimal-transport relaxation.
+    """Pairwise sigmoid soft ranking.
 
     NaN values in scores will propagate to the output. Filter NaN before
     calling if this is not desired.
 
     Args:
         scores: 1D array of scores to rank.
-        temperature: Smoothing temperature (higher = smoother). Default 1.0.
+        temperature: Inverse temperature (higher = sharper). Default 1.0.
 
     Returns:
         numpy array of soft ranks (0-indexed, fractional).
@@ -34,15 +34,27 @@ def soft_rank(scores: _Scores, temperature: float = 1.0) -> NDArray[np.float64]:
     ...
 
 def soft_rank_neural_sort(scores: _Scores, temperature: float = 1.0) -> NDArray[np.float64]:
-    """Differentiable soft ranking using the NeuralSort relaxation.
+    """Compatibility name for pairwise logistic ranks, not NeuralSort.
 
     Args:
         scores: 1D array of scores to rank.
-        temperature: Smoothing temperature (higher = smoother). Default 1.0.
+        temperature: Smoothing temperature (lower = sharper). Default 1.0.
 
     Returns:
         numpy array of soft ranks (0-indexed, fractional).
     """
+    ...
+
+def pairwise_logistic_rank(scores: _Scores, temperature: float = 1.0) -> NDArray[np.float64]:
+    """Pairwise logistic ranks; lower temperature is sharper."""
+    ...
+
+def neural_sort(scores: _Scores, temperature: float = 1.0) -> NDArray[np.float64]:
+    """Exact NeuralSort matrix; rows are positions and columns are input items."""
+    ...
+
+def soft_sort(scores: _Scores, temperature: float = 1.0) -> NDArray[np.float64]:
+    """Exact SoftSort matrix; rows are positions and columns are input items."""
     ...
 
 def soft_rank_sigmoid(scores: _Scores, temperature: float = 1.0) -> NDArray[np.float64]:
@@ -50,7 +62,7 @@ def soft_rank_sigmoid(scores: _Scores, temperature: float = 1.0) -> NDArray[np.f
 
     Args:
         scores: 1D array of scores to rank.
-        temperature: Smoothing temperature (higher = smoother). Default 1.0.
+        temperature: Inverse temperature (higher = sharper). Default 1.0.
 
     Returns:
         numpy array of soft ranks (0-indexed, fractional).
@@ -62,7 +74,7 @@ def soft_rank_smooth_i(scores: _Scores, temperature: float = 1.0) -> NDArray[np.
 
     Args:
         scores: 1D array of scores to rank.
-        temperature: Smoothing temperature (higher = smoother). Default 1.0.
+        temperature: Inverse temperature (higher = sharper). Default 1.0.
 
     Returns:
         numpy array of soft ranks (0-indexed, fractional).
@@ -72,12 +84,12 @@ def soft_rank_smooth_i(scores: _Scores, temperature: float = 1.0) -> NDArray[np.
 def differentiable_topk(
     scores: _Scores, k: int, temperature: float = 1.0
 ) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
-    """Differentiable top-k selection via relaxed permutation matrices.
+    """Differentiable top-k selection via pairwise soft-rank thresholding.
 
     Args:
         scores: 1D array of scores.
         k: Number of top elements to select.
-        temperature: Smoothing temperature. Default 1.0.
+        temperature: Inverse temperature (higher = sharper). Default 1.0.
 
     Returns:
         Tuple of (values, indicators) as numpy arrays. ``values`` contains

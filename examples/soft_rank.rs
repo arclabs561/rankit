@@ -3,13 +3,13 @@
 //! Demonstrates how `soft_rank` produces continuous rank approximations that
 //! converge to discrete ranks as regularization strength increases.
 
-use rankit::{soft_rank, soft_rank_neural_sort, soft_rank_sigmoid, soft_rank_smooth_i};
+use rankit::{pairwise_logistic_rank, soft_rank, soft_rank_sigmoid, soft_rank_smooth_i};
 
 fn main() {
     let scores = vec![5.0, 1.0, 2.0, 4.0, 3.0];
     // Discrete ranks (0-indexed, 0=lowest): [4, 0, 1, 3, 2]
 
-    // --- Effect of regularization strength (temperature) ---
+    // --- Effect of regularization strength (inverse temperature) ---
     println!("Scores: {:?}\n", scores);
     for &alpha in &[0.1, 1.0, 10.0, 100.0] {
         let ranks = soft_rank(&scores, alpha);
@@ -24,8 +24,8 @@ fn main() {
     #[allow(clippy::type_complexity)]
     let methods: [(&str, fn(&[f64], f64) -> Vec<f64>); 3] = [
         ("Sigmoid", soft_rank_sigmoid),
-        ("NeuralSort", soft_rank_neural_sort),
-        ("SmoothI", soft_rank_smooth_i),
+        ("Pairwise logistic", pairwise_logistic_rank),
+        ("Sigmoid alias", soft_rank_smooth_i),
     ];
     for (name, method) in &methods {
         let ranks = method(&scores, alpha);

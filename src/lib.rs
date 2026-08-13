@@ -90,8 +90,8 @@ pub use gradients::{
     LambdaRankParams, LambdaRankTrainer, RankingSVMParams, RankingSVMTrainer,
 };
 pub use methods::{
-    soft_rank_neural_sort, soft_rank_probabilistic, soft_rank_sigmoid, soft_rank_smooth_i,
-    RankingMethod,
+    logistic_gaussian_rank_approximation, pairwise_logistic_rank, soft_rank_neural_sort,
+    soft_rank_probabilistic, soft_rank_sigmoid, soft_rank_smooth_i, RankingMethod,
 };
 pub use optimized::{soft_rank_gradient_sparse, soft_rank_optimized};
 pub use rank::soft_rank;
@@ -105,8 +105,8 @@ pub use optimized::soft_rank_batch_parallel;
 
 #[cfg(feature = "losses")]
 pub use losses::{
-    approx_ndcg, approx_ndcg_loss, lambda_loss, listmle_loss, listnet_loss, ranknet_loss,
-    soft_rank_softsort,
+    approx_ndcg, approx_ndcg_loss, index_weighted_pairwise_rank, lambda_loss, listmle_loss,
+    listnet_loss, ranknet_loss, soft_rank_softsort,
 };
 
 // --- Re-exports: gumbel ---

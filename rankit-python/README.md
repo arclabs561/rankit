@@ -32,11 +32,14 @@ score = ranklab.ndcg(ranked, qrels, k=3)
 
 | Name | Description |
 |------|-------------|
-| `soft_rank` | Soft ranking via optimal-transport relaxation |
-| `soft_rank_neural_sort` | Soft ranking via NeuralSort relaxation |
+| `soft_rank` | Pairwise sigmoid soft ranks; higher strength is sharper |
+| `pairwise_logistic_rank` | Pairwise logistic rank heuristic |
+| `neural_sort` | NeuralSort relaxation matrix |
+| `soft_sort` | SoftSort relaxation matrix |
+| `soft_rank_neural_sort` | Compatibility name for `pairwise_logistic_rank`; not NeuralSort |
 | `soft_rank_sigmoid` | Soft ranking via sigmoid pairwise comparisons |
-| `soft_rank_smooth_i` | Soft ranking via smooth indicator functions |
-| `differentiable_topk` | Differentiable top-k selection, returns (values, indicators) |
+| `soft_rank_smooth_i` | Compatibility name for `soft_rank_sigmoid`; not SmoothI |
+| `differentiable_topk` | Pairwise soft-rank thresholding, returns (values, indicators) |
 | `ranknet_loss` | RankNet pairwise cross-entropy loss |
 | `approx_ndcg` | Differentiable NDCG approximation via softmax |
 | `lambda_loss` | LambdaLoss ranking loss |

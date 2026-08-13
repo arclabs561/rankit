@@ -1,16 +1,21 @@
 //! Python bindings for rankit (Rust) using PyO3.
 
-use numpy::{IntoPyArray, PyArray1, PyReadonlyArray1};
+use numpy::{IntoPyArray, PyArray1, PyArray2, PyReadonlyArray1};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::collections::{HashMap, HashSet};
 
-use rankit::eval::{binary, graded, statistics, trec, batch};
+use rankit::eval::{batch, binary, graded, statistics, trec};
 use rankit::gradients::{
     compute_lambdarank_gradients, compute_ranking_svm_gradients, LambdaRankParams, RankingSVMParams,
 };
 use rankit::losses::{approx_ndcg, lambda_loss, listmle_loss, listnet_loss, ranknet_loss};
-use rankit::methods::{soft_rank_neural_sort, soft_rank_sigmoid, soft_rank_smooth_i};
-use rankit::{differentiable_topk, soft_rank};
+use rankit::methods::{
+    pairwise_logistic_rank, soft_rank_neural_sort, soft_rank_sigmoid, soft_rank_smooth_i,
+};
+use rankit::{differentiable_topk, neural_sort, soft_rank, soft_sort};
+
+type PyArrayPair<'py> = (Bound<'py, PyArray1<f64>>, Bound<'py, PyArray1<f64>>);
 
 // ---------------------------------------------------------------------------
 // Helpers: accept numpy 1D array OR Python list
@@ -42,11 +47,11 @@ fn extract_f32_vec(input: &Bound<'_, PyAny>) -> PyResult<Vec<f32>> {
 // Differentiable ranking
 // ---------------------------------------------------------------------------
 
-/// Differentiable soft ranking using optimal-transport relaxation.
+/// Pairwise sigmoid soft ranking.
 ///
 /// Args:
 ///     scores: 1D array of scores to rank.
-///     temperature: Smoothing temperature (higher = smoother). Default 1.0.
+///     temperature: Inverse temperature (higher = sharper). Default 1.0.
 ///
 /// Returns:
 ///     numpy array of soft ranks (0-indexed, fractional).
@@ -62,11 +67,11 @@ fn soft_rank_py<'py>(
     Ok(result.into_pyarray(py))
 }
 
-/// Differentiable soft ranking using the NeuralSort relaxation.
+/// Compatibility name for pairwise logistic soft ranks, not NeuralSort.
 ///
 /// Args:
 ///     scores: 1D array of scores to rank.
-///     temperature: Smoothing temperature (higher = smoother). Default 1.0.
+///     temperature: Smoothing temperature (lower = sharper). Default 1.0.
 ///
 /// Returns:
 ///     numpy array of soft ranks (0-indexed, fractional).
@@ -82,11 +87,57 @@ fn soft_rank_neural_sort_py<'py>(
     Ok(result.into_pyarray(py))
 }
 
+/// Pairwise logistic soft ranks.
+///
+/// Lower positive temperatures produce sharper comparisons.
+#[pyfunction(name = "pairwise_logistic_rank")]
+#[pyo3(signature = (scores, temperature = 1.0))]
+fn pairwise_logistic_rank_py<'py>(
+    py: Python<'py>,
+    scores: &Bound<'py, PyAny>,
+    temperature: f64,
+) -> PyResult<Bound<'py, PyArray1<f64>>> {
+    let scores = extract_f64_vec(scores)?;
+    Ok(pairwise_logistic_rank(&scores, temperature).into_pyarray(py))
+}
+
+/// Exact NeuralSort relaxation matrix.
+///
+/// Rows are descending output positions; columns are input items.
+#[pyfunction(name = "neural_sort")]
+#[pyo3(signature = (scores, temperature = 1.0))]
+fn neural_sort_py<'py>(
+    py: Python<'py>,
+    scores: &Bound<'py, PyAny>,
+    temperature: f64,
+) -> PyResult<Bound<'py, PyArray2<f64>>> {
+    let scores = extract_f64_vec(scores)?;
+    let matrix = neural_sort(&scores, temperature)
+        .map_err(|error| PyValueError::new_err(error.to_string()))?;
+    PyArray2::from_vec2(py, &matrix).map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
+/// Exact absolute-distance SoftSort relaxation matrix.
+///
+/// Rows are descending output positions; columns are input items.
+#[pyfunction(name = "soft_sort")]
+#[pyo3(signature = (scores, temperature = 1.0))]
+fn soft_sort_py<'py>(
+    py: Python<'py>,
+    scores: &Bound<'py, PyAny>,
+    temperature: f64,
+) -> PyResult<Bound<'py, PyArray2<f64>>> {
+    let scores = extract_f64_vec(scores)?;
+    let matrix = soft_sort(&scores, temperature)
+        .map_err(|error| PyValueError::new_err(error.to_string()))?;
+    PyArray2::from_vec2(py, &matrix).map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
 /// Differentiable soft ranking using sigmoid-based pairwise comparisons.
 ///
 /// Args:
 ///     scores: 1D array of scores to rank.
-///     temperature: Smoothing temperature (higher = smoother). Default 1.0.
+///     temperature: Inverse temperature (higher = sharper). Default 1.0.
 ///
 /// Returns:
 ///     numpy array of soft ranks (0-indexed, fractional).
@@ -106,7 +157,7 @@ fn soft_rank_sigmoid_py<'py>(
 ///
 /// Args:
 ///     scores: 1D array of scores to rank.
-///     temperature: Smoothing temperature (higher = smoother). Default 1.0.
+///     temperature: Inverse temperature (higher = sharper). Default 1.0.
 ///
 /// Returns:
 ///     numpy array of soft ranks (0-indexed, fractional).
@@ -122,12 +173,12 @@ fn soft_rank_smooth_i_py<'py>(
     Ok(result.into_pyarray(py))
 }
 
-/// Differentiable top-k selection via relaxed permutation matrices.
+/// Differentiable top-k selection via pairwise soft-rank thresholding.
 ///
 /// Args:
 ///     scores: 1D array of scores.
 ///     k: Number of top elements to select.
-///     temperature: Smoothing temperature. Default 1.0.
+///     temperature: Inverse temperature (higher = sharper). Default 1.0.
 ///
 /// Returns:
 ///     Tuple of (values, indicators) as numpy arrays. `values` contains
@@ -139,7 +190,7 @@ fn differentiable_topk_py<'py>(
     scores: &Bound<'py, PyAny>,
     k: usize,
     temperature: f64,
-) -> PyResult<(Bound<'py, PyArray1<f64>>, Bound<'py, PyArray1<f64>>)> {
+) -> PyResult<PyArrayPair<'py>> {
     let scores = extract_f64_vec(scores)?;
     let (values, indicators) = differentiable_topk(&scores, k, temperature);
     Ok((values.into_pyarray(py), indicators.into_pyarray(py)))
@@ -163,9 +214,11 @@ fn ranknet_loss_py(predictions: &Bound<'_, PyAny>, relevance: &Bound<'_, PyAny>)
     let predictions = extract_f64_vec(predictions)?;
     let relevance = extract_f64_vec(relevance)?;
     if predictions.len() != relevance.len() {
-        return Err(pyo3::exceptions::PyValueError::new_err(
-            format!("predictions length ({}) != relevance length ({})", predictions.len(), relevance.len())
-        ));
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "predictions length ({}) != relevance length ({})",
+            predictions.len(),
+            relevance.len()
+        )));
     }
     Ok(ranknet_loss(&predictions, &relevance))
 }
@@ -191,9 +244,11 @@ fn approx_ndcg_py(
     let predictions = extract_f64_vec(predictions)?;
     let relevance = extract_f64_vec(relevance)?;
     if predictions.len() != relevance.len() {
-        return Err(pyo3::exceptions::PyValueError::new_err(
-            format!("predictions length ({}) != relevance length ({})", predictions.len(), relevance.len())
-        ));
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "predictions length ({}) != relevance length ({})",
+            predictions.len(),
+            relevance.len()
+        )));
     }
     Ok(approx_ndcg(&predictions, &relevance, temperature, k))
 }
@@ -217,9 +272,11 @@ fn lambda_loss_py(
     let predictions = extract_f64_vec(predictions)?;
     let relevance = extract_f64_vec(relevance)?;
     if predictions.len() != relevance.len() {
-        return Err(pyo3::exceptions::PyValueError::new_err(
-            format!("predictions length ({}) != relevance length ({})", predictions.len(), relevance.len())
-        ));
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "predictions length ({}) != relevance length ({})",
+            predictions.len(),
+            relevance.len()
+        )));
     }
     Ok(lambda_loss(&predictions, &relevance, k))
 }
@@ -243,9 +300,11 @@ fn listnet_loss_py(
     let predictions = extract_f64_vec(predictions)?;
     let relevance = extract_f64_vec(relevance)?;
     if predictions.len() != relevance.len() {
-        return Err(pyo3::exceptions::PyValueError::new_err(
-            format!("predictions length ({}) != relevance length ({})", predictions.len(), relevance.len())
-        ));
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "predictions length ({}) != relevance length ({})",
+            predictions.len(),
+            relevance.len()
+        )));
     }
     Ok(listnet_loss(&predictions, &relevance, 1.0 / temperature))
 }
@@ -269,9 +328,11 @@ fn listmle_loss_py(
     let predictions = extract_f64_vec(predictions)?;
     let relevance = extract_f64_vec(relevance)?;
     if predictions.len() != relevance.len() {
-        return Err(pyo3::exceptions::PyValueError::new_err(
-            format!("predictions length ({}) != relevance length ({})", predictions.len(), relevance.len())
-        ));
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "predictions length ({}) != relevance length ({})",
+            predictions.len(),
+            relevance.len()
+        )));
     }
     Ok(listmle_loss(&predictions, &relevance, 1.0 / temperature))
 }
@@ -304,9 +365,11 @@ fn compute_lambdarank_gradients_py<'py>(
     let scores = extract_f32_vec(scores)?;
     let relevance = extract_f32_vec(relevance)?;
     if scores.len() != relevance.len() {
-        return Err(pyo3::exceptions::PyValueError::new_err(
-            format!("scores length ({}) != relevance length ({})", scores.len(), relevance.len())
-        ));
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "scores length ({}) != relevance length ({})",
+            scores.len(),
+            relevance.len()
+        )));
     }
     let params = LambdaRankParams {
         sigma,
@@ -340,9 +403,11 @@ fn compute_ranking_svm_gradients_py<'py>(
     let scores = extract_f32_vec(scores)?;
     let relevance = extract_f32_vec(relevance)?;
     if scores.len() != relevance.len() {
-        return Err(pyo3::exceptions::PyValueError::new_err(
-            format!("scores length ({}) != relevance length ({})", scores.len(), relevance.len())
-        ));
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "scores length ({}) != relevance length ({})",
+            scores.len(),
+            relevance.len()
+        )));
     }
     let params = RankingSVMParams {
         c,
@@ -608,9 +673,11 @@ fn paired_t_test_py<'py>(
     let a = extract_f64_vec(scores_a)?;
     let b = extract_f64_vec(scores_b)?;
     if a.len() != b.len() {
-        return Err(pyo3::exceptions::PyValueError::new_err(
-            format!("scores_a length ({}) != scores_b length ({})", a.len(), b.len()),
-        ));
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "scores_a length ({}) != scores_b length ({})",
+            a.len(),
+            b.len()
+        )));
     }
     let result = statistics::paired_t_test(&a, &b, alpha);
     let d = pyo3::types::PyDict::new(py);
@@ -633,10 +700,7 @@ fn paired_t_test_py<'py>(
 ///     Tuple of (lower, upper) bounds.
 #[pyfunction(name = "confidence_interval")]
 #[pyo3(signature = (scores, confidence = 0.95))]
-fn confidence_interval_py(
-    scores: &Bound<'_, PyAny>,
-    confidence: f64,
-) -> PyResult<(f64, f64)> {
+fn confidence_interval_py(scores: &Bound<'_, PyAny>, confidence: f64) -> PyResult<(f64, f64)> {
     let s = extract_f64_vec(scores)?;
     Ok(statistics::confidence_interval(&s, confidence))
 }
@@ -656,16 +720,15 @@ fn confidence_interval_py(
 ///     ValueError: If inputs have different lengths.
 #[pyfunction(name = "cohens_d")]
 #[pyo3(signature = (scores_a, scores_b))]
-fn cohens_d_py(
-    scores_a: &Bound<'_, PyAny>,
-    scores_b: &Bound<'_, PyAny>,
-) -> PyResult<f64> {
+fn cohens_d_py(scores_a: &Bound<'_, PyAny>, scores_b: &Bound<'_, PyAny>) -> PyResult<f64> {
     let a = extract_f64_vec(scores_a)?;
     let b = extract_f64_vec(scores_b)?;
     if a.len() != b.len() {
-        return Err(pyo3::exceptions::PyValueError::new_err(
-            format!("scores_a length ({}) != scores_b length ({})", a.len(), b.len()),
-        ));
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "scores_a length ({}) != scores_b length ({})",
+            a.len(),
+            b.len()
+        )));
     }
     Ok(statistics::cohens_d(&a, &b))
 }
@@ -713,8 +776,8 @@ fn load_trec_run_py(path: &str) -> PyResult<HashMap<String, Vec<(String, f32)>>>
 #[pyfunction(name = "load_qrels")]
 #[pyo3(signature = (path))]
 fn load_qrels_py(path: &str) -> PyResult<HashMap<String, HashMap<String, u32>>> {
-    let qrels = trec::load_qrels(path)
-        .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
+    let qrels =
+        trec::load_qrels(path).map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
     Ok(trec::group_qrels_by_query(&qrels))
 }
 
@@ -745,7 +808,8 @@ fn evaluate_batch_py<'py>(
     qrels: Vec<Vec<String>>,
     metrics: Vec<String>,
 ) -> PyResult<Bound<'py, pyo3::types::PyDict>> {
-    let qrel_sets: Vec<HashSet<String>> = qrels.into_iter().map(|v| v.into_iter().collect()).collect();
+    let qrel_sets: Vec<HashSet<String>> =
+        qrels.into_iter().map(|v| v.into_iter().collect()).collect();
     let metric_strs: Vec<&str> = metrics.iter().map(|s| s.as_str()).collect();
     let results = batch::evaluate_batch_binary(&rankings, &qrel_sets, &metric_strs);
 
@@ -825,11 +889,17 @@ fn spearman_loss_py(
     let preds = extract_f64_vec(predictions)?;
     let targs = extract_f64_vec(targets)?;
     if preds.len() != targs.len() {
-        return Err(pyo3::exceptions::PyValueError::new_err(
-            format!("predictions length ({}) != targets length ({})", preds.len(), targs.len())
-        ));
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "predictions length ({}) != targets length ({})",
+            preds.len(),
+            targs.len()
+        )));
     }
-    Ok(rankit::spearman_loss(&preds, &targs, regularization_strength))
+    Ok(rankit::spearman_loss(
+        &preds,
+        &targs,
+        regularization_strength,
+    ))
 }
 
 // ---------------------------------------------------------------------------
@@ -841,6 +911,9 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Differentiable ranking
     m.add_function(wrap_pyfunction!(soft_rank_py, m)?)?;
     m.add_function(wrap_pyfunction!(soft_rank_neural_sort_py, m)?)?;
+    m.add_function(wrap_pyfunction!(pairwise_logistic_rank_py, m)?)?;
+    m.add_function(wrap_pyfunction!(neural_sort_py, m)?)?;
+    m.add_function(wrap_pyfunction!(soft_sort_py, m)?)?;
     m.add_function(wrap_pyfunction!(soft_rank_sigmoid_py, m)?)?;
     m.add_function(wrap_pyfunction!(soft_rank_smooth_i_py, m)?)?;
     m.add_function(wrap_pyfunction!(differentiable_topk_py, m)?)?;

@@ -7,7 +7,7 @@ Learning-to-rank losses and evaluation.
 
 ## What it does
 
-- **Differentiable ranking**: sigmoid-based soft ranking $\hat{R}_i(\mathbf{s}) = \sum_{j \neq i} \sigma\bigl(\tau(s_j - s_i)\bigr)$. Additional variants are lightweight heuristics inspired by NeuralSort, probabilistic ranking, and SmoothI. They are $O(n^2)$.
+- **Differentiable ranking**: sigmoid-based soft ranking $\hat{R}_i(\mathbf{s}) = \sum_{j \neq i} \sigma\bigl(\tau(s_j - s_i)\bigr)$. Historical paper-named variants are retained as documented compatibility heuristics. They are $O(n^2)$.
 - **Sorting relaxations**: `neural_sort` and `soft_sort` return row-stochastic matrices following the published NeuralSort and SoftSort formulas; expected-rank adapters are also provided.
 - **LTR objectives**: RankNet, an NDCG-weighted pairwise loss, ApproxNDCG, top-one ListNet, and a ListMLE-inspired objective (see formulas below).
 - **Gradient trainers**: LambdaRank and Ranking SVM with configurable query normalization, cost sensitivity, and score normalization.

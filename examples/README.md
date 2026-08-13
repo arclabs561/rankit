@@ -54,7 +54,7 @@ LTR significance: rankit NDCG@10 + statskit
 ### `soft_rank` — how do you turn a hard ranking into a differentiable one?
 
 Soft ranks at increasing sharpness `alpha` (recovering the hard permutation in
-the limit), and a comparison of the Sigmoid, NeuralSort, and SmoothI methods.
+the limit), and a comparison of the pairwise sigmoid compatibility heuristics.
 
 ```bash
 cargo run --release --example soft_rank
@@ -68,8 +68,8 @@ alpha= 10.0  ranks=[4.000, 0.000, 1.000, 3.000, 2.000]
 
 Method comparison (alpha=5):
   Sigmoid      [3.993, 0.007, 1.000, 3.000, 2.000]
-  NeuralSort   [2.484, 1.516, 1.756, 2.244, 2.000]
-  SmoothI      [3.993, 0.007, 1.000, 3.000, 2.000]
+  Pairwise logistic [2.484, 1.516, 1.756, 2.244, 2.000]
+  Sigmoid alias [3.993, 0.007, 1.000, 3.000, 2.000]
 ```
 
 ### `lambdarank` — which documents does LambdaRank push up or down?

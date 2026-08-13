@@ -5,7 +5,8 @@
 //! - **ApproxNDCG**: Differentiable NDCG approximation (Qin & Liu, 2010)
 //! - **ListNet**: Cross-entropy over top-one softmax distributions
 //! - **ListMLE-style**: Permutation likelihood computed from soft ranks
-//! - **SoftSort-style**: A simplified sorting relaxation
+//! - **Index-weighted pairwise rank**: A compatibility heuristic historically
+//!   named `soft_rank_softsort`
 
 use crate::rank::sigmoid;
 
@@ -18,10 +19,11 @@ fn logaddexp(left: f64, right: f64) -> f64 {
     maximum + ((left - maximum).exp() + (right - maximum).exp()).ln()
 }
 
-/// SoftSort-inspired ranking heuristic.
+/// Index-weighted pairwise logistic ranking heuristic.
 ///
-/// From: "SoftSort: A Continuous Relaxation for the argsort Operator" (ICML 2020)
-pub fn soft_rank_softsort(values: &[f64], regularization_strength: f64) -> Vec<f64> {
+/// The weights depend on the input positions, so this function is not
+/// permutation equivariant. Use [`crate::soft_sort`] for SoftSort.
+pub fn index_weighted_pairwise_rank(values: &[f64], regularization_strength: f64) -> Vec<f64> {
     let n = values.len();
     if n == 0 {
         return vec![];
@@ -62,6 +64,13 @@ pub fn soft_rank_softsort(values: &[f64], regularization_strength: f64) -> Vec<f
     }
 
     ranks
+}
+
+/// Compatibility name for [`index_weighted_pairwise_rank`].
+///
+/// Despite its historical name, this does not implement SoftSort.
+pub fn soft_rank_softsort(values: &[f64], regularization_strength: f64) -> Vec<f64> {
+    index_weighted_pairwise_rank(values, regularization_strength)
 }
 
 /// RankNet pairwise loss.
@@ -344,6 +353,29 @@ pub fn listmle_loss(predictions: &[f64], targets: &[f64], regularization_strengt
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn compatibility_name_matches_index_weighted_heuristic() {
+        let values = [4.0, 1.0, 3.0, 2.0];
+        assert_eq!(
+            soft_rank_softsort(&values, 0.8),
+            index_weighted_pairwise_rank(&values, 0.8)
+        );
+    }
+
+    #[test]
+    fn index_weighting_is_not_permutation_equivariant() {
+        let values = [4.0, 1.0, 3.0, 2.0];
+        let permutation = [2, 0, 3, 1];
+        let permuted: Vec<_> = permutation.iter().map(|&index| values[index]).collect();
+        let original = index_weighted_pairwise_rank(&values, 0.8);
+        let actual = index_weighted_pairwise_rank(&permuted, 0.8);
+
+        assert!(permutation
+            .iter()
+            .enumerate()
+            .any(|(new_index, &old_index)| (actual[new_index] - original[old_index]).abs() > 1e-6));
+    }
 
     fn discrete_ndcg_at_k(predictions: &[f64], relevance: &[f64], k: usize) -> f64 {
         let mut indices: Vec<_> = (0..predictions.len()).collect();
