@@ -197,6 +197,7 @@ fn compute_delta_ndcg(
 /// ApproxNDCG: differentiable approximation of NDCG.
 ///
 /// From: Qin & Liu (2010). Returns approximate NDCG in [0, 1] (higher is better).
+/// When `k` is set, a smooth cutoff excludes documents below the top-k boundary.
 pub fn approx_ndcg(
     predictions: &[f64],
     relevance: &[f64],
@@ -226,8 +227,13 @@ pub fn approx_ndcg(
         let gain = 2.0_f64.powf(relevance[i]) - 1.0;
         let position = (n as f64 - 1.0) - soft_ranks[i];
         let soft_discount = 1.0 / (position + 2.0).log2();
+        let membership = if k < n {
+            sigmoid(regularization_strength * (k as f64 - 0.5 - position))
+        } else {
+            1.0
+        };
 
-        approx_dcg += gain * soft_discount;
+        approx_dcg += membership * gain * soft_discount;
     }
 
     (approx_dcg / idcg).min(1.0)
@@ -322,6 +328,39 @@ pub fn listmle_loss(predictions: &[f64], targets: &[f64], regularization_strengt
 mod tests {
     use super::*;
 
+    fn discrete_ndcg_at_k(predictions: &[f64], relevance: &[f64], k: usize) -> f64 {
+        let mut indices: Vec<_> = (0..predictions.len()).collect();
+        indices.sort_unstable_by(|&a, &b| predictions[b].partial_cmp(&predictions[a]).unwrap());
+
+        let dcg: f64 = indices
+            .iter()
+            .take(k)
+            .enumerate()
+            .map(|(rank, &index)| {
+                (2.0_f64.powf(relevance[index]) - 1.0) / (rank as f64 + 2.0).log2()
+            })
+            .sum();
+        let idcg = compute_idcg(relevance, k);
+        if idcg > 0.0 {
+            dcg / idcg
+        } else {
+            1.0
+        }
+    }
+
+    fn permutations(values: &mut [f64], start: usize, output: &mut Vec<Vec<f64>>) {
+        if start == values.len() {
+            output.push(values.to_vec());
+            return;
+        }
+
+        for index in start..values.len() {
+            values.swap(start, index);
+            permutations(values, start + 1, output);
+            values.swap(start, index);
+        }
+    }
+
     #[test]
     fn test_ranknet_loss() {
         let predictions = vec![0.8, 0.3, 0.6];
@@ -366,5 +405,34 @@ mod tests {
         let relevance = vec![2.0, 0.0, 1.0];
         let ndcg = approx_ndcg(&predictions, &relevance, 1.0, None);
         assert!((0.0..=1.0).contains(&ndcg));
+    }
+
+    #[test]
+    fn approx_ndcg_at_k_converges_to_discrete_oracle() {
+        let relevance = [3.0, 2.0, 1.0, 0.0];
+        let mut scores = [1.0, 2.0, 3.0, 4.0];
+        let mut score_permutations = Vec::new();
+        permutations(&mut scores, 0, &mut score_permutations);
+
+        for predictions in score_permutations {
+            for k in 1..=predictions.len() {
+                let expected = discrete_ndcg_at_k(&predictions, &relevance, k);
+                let actual = approx_ndcg(&predictions, &relevance, 100.0, Some(k));
+                assert!(
+                    (actual - expected).abs() < 1e-10,
+                    "predictions={predictions:?}, k={k}, expected={expected}, actual={actual}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn approx_ndcg_at_one_does_not_credit_lower_ranks() {
+        let predictions = [1.0, 3.0, 2.0];
+        let relevance = [3.0, 2.0, 1.0];
+
+        let actual = approx_ndcg(&predictions, &relevance, 100.0, Some(1));
+        let expected = 3.0 / 7.0;
+        assert!((actual - expected).abs() < 1e-10);
     }
 }
