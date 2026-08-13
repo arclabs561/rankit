@@ -118,6 +118,13 @@ impl TopKCrossEntropyLoss {
 
         let k = self.config.p_k.len();
 
+        // The paper's default top-1 mode uses ordinary softmax cross-entropy.
+        // Besides matching that definition, this keeps `top1()` independent of
+        // the soft-ranking temperature and truncation settings.
+        if self.config.p_k.as_slice() == [1.0] {
+            return softmax_ce(logits, label);
+        }
+
         // Step 1: select top-m scores for efficiency
         let m = self.config.m.unwrap_or(n).min(n).max(k);
 
@@ -245,6 +252,21 @@ mod tests {
         let logits = vec![5.0, 0.1, 0.1, 0.1, 0.1];
         let loss = loss_fn.compute(&logits, 2);
         assert!(loss > 1.0, "Wrong prediction should have high loss: {loss}");
+    }
+
+    #[test]
+    fn test_top1_matches_softmax_cross_entropy() {
+        let loss_fn = TopKCrossEntropyLoss::top1();
+        let logits = vec![1.25, -0.5, 0.75, 2.0];
+
+        for label in 0..logits.len() {
+            let actual = loss_fn.compute(&logits, label);
+            let expected = softmax_ce(&logits, label);
+            assert!(
+                (actual - expected).abs() < 1e-12,
+                "top1 loss differs from softmax CE for label {label}: {actual} != {expected}"
+            );
+        }
     }
 
     #[test]
