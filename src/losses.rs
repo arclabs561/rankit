@@ -1,15 +1,15 @@
 //! LTR loss functions and advanced ranking operations.
 //!
 //! - **RankNet**: Pairwise logistic loss (Burges et al., ICML 2005)
-//! - **LambdaLoss**: NDCG-weighted pairwise loss (Burges, 2010)
+//! - **NDCG-weighted pairwise**: RankNet-style terms weighted by swapped-pair delta NDCG
 //! - **ApproxNDCG**: Differentiable NDCG approximation (Qin & Liu, 2010)
-//! - **ListNet**: Listwise cross-entropy loss (ICML 2007)
-//! - **ListMLE**: Listwise maximum likelihood (ICML 2008)
-//! - **SoftSort**: OT-based sorting relaxation (ICML 2020)
+//! - **ListNet-style**: Listwise cross-entropy over soft-rank distributions
+//! - **ListMLE-style**: Permutation likelihood computed from soft ranks
+//! - **SoftSort-style**: A simplified sorting relaxation
 
 use crate::rank::sigmoid;
 
-/// SoftSort using optimal transport (simplified).
+/// SoftSort-inspired ranking heuristic.
 ///
 /// From: "SoftSort: A Continuous Relaxation for the argsort Operator" (ICML 2020)
 pub fn soft_rank_softsort(values: &[f64], regularization_strength: f64) -> Vec<f64> {
@@ -94,7 +94,7 @@ pub fn ranknet_loss(predictions: &[f64], relevance: &[f64]) -> f64 {
     }
 }
 
-/// LambdaLoss: RankNet with NDCG-aware pair weighting.
+/// RankNet-style loss with NDCG-aware pair weighting.
 ///
 /// From: "From RankNet to LambdaRank to LambdaMART" (Burges, 2010)
 ///
@@ -284,7 +284,7 @@ fn softmax_from_ranks(ranks: &[f64]) -> Vec<f64> {
         .collect()
 }
 
-/// ListMLE-style maximum likelihood estimation for ranking.
+/// ListMLE-inspired likelihood objective computed from soft ranks.
 ///
 /// From: "Listwise Approach to Learning to Rank: Theory and Algorithm" (ICML 2008)
 pub fn listmle_loss(predictions: &[f64], targets: &[f64], regularization_strength: f64) -> f64 {

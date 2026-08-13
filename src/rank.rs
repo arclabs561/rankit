@@ -3,7 +3,7 @@
 //! This module implements the sigmoid-based approach to differentiable ranking.
 //! O(n^2) complexity, suitable for n < 1000.
 //!
-//! # Algorithm
+//! # Heuristic
 //!
 //! The rank of element `i` is computed as:
 //! ```text

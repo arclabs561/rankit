@@ -1,12 +1,12 @@
-//! Multiple differentiable ranking methods from research papers.
+//! Differentiable ranking heuristics inspired by published methods.
 //!
 //! Each method has O(n^2) complexity and normalizes to [0, n-1] range.
 //!
 //! | Method | Best For |
 //! |--------|----------|
 //! | **Sigmoid** | General use (default) |
-//! | **NeuralSort** | Permutation matrices |
-//! | **Probabilistic** | Probabilistic rank distributions |
+//! | **NeuralSort** | NeuralSort-style scores |
+//! | **Probabilistic** | Probabilistic-style rank scores |
 //! | **SmoothI** | Alternative gradient profiles |
 
 use crate::rank::sigmoid;
@@ -51,7 +51,7 @@ pub fn soft_rank_sigmoid(values: &[f64], regularization_strength: f64) -> Vec<f6
     ranks
 }
 
-/// NeuralSort-style ranking using temperature-scaled softmax.
+/// NeuralSort-inspired ranking using temperature-scaled softmax.
 ///
 /// From: "NeuralSort: A Differentiable Sorting Operator" (Grover et al., ICML 2019)
 pub fn soft_rank_neural_sort(values: &[f64], temperature: f64) -> Vec<f64> {

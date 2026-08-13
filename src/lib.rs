@@ -2,13 +2,12 @@
 //! Learning to Rank for Rust: differentiable ranking, LTR losses, trainers,
 //! and IR evaluation metrics.
 //!
-//! rankit provides everything needed to train and evaluate ranking models:
+//! The crate provides ranking objectives, trainers, and evaluation helpers:
 //!
-//! - **Differentiable ranking**: sigmoid-based soft ranking with multiple method
-//!   variants (NeuralSort, SoftRank, SmoothI). O(n^2) complexity, suitable for
-//!   n < 1000.
-//! - **LTR losses**: RankNet, LambdaLoss (NDCG-weighted), ApproxNDCG, ListNet,
-//!   ListMLE. Pairwise and listwise paradigms.
+//! - **Differentiable ranking**: sigmoid-based soft ranking and lightweight
+//!   variants inspired by NeuralSort, probabilistic ranking, and SmoothI.
+//! - **LTR objectives**: RankNet, an NDCG-weighted pairwise objective,
+//!   ApproxNDCG, and ListNet- and ListMLE-style objectives.
 //! - **Trainers**: LambdaRank and Ranking SVM with query normalization, cost
 //!   sensitivity, and score normalization options.
 //! - **Evaluation** (feature `eval`): NDCG, MAP, MRR, Precision/Recall@K, ERR,
@@ -36,7 +35,7 @@
 //! | Feature | Default | What it adds |
 //! |---------|---------|-------------|
 //! | `eval` | yes | IR evaluation metrics, TREC parsing, batch eval, statistics |
-//! | `losses` | yes | LTR loss functions (RankNet, LambdaLoss, ApproxNDCG, ListNet, ListMLE) |
+//! | `losses` | yes | Pairwise, approximate NDCG, and listwise-style objectives |
 //! | `gumbel` | no | Gumbel-Softmax, relaxed top-k (requires `rand`) |
 //! | `parallel` | no | Rayon parallelization for batch operations |
 //! | `serde` | no | Serialization for eval result types |
@@ -44,7 +43,7 @@
 /// Differentiable ranking operations (sigmoid-based, O(n^2)).
 pub mod rank;
 
-/// Multiple ranking method variants from research papers.
+/// Ranking heuristics inspired by published methods.
 pub mod methods;
 
 /// Analytical gradient computation for soft ranking and Spearman loss.

@@ -7,8 +7,8 @@ Learning-to-rank losses and evaluation.
 
 ## What it does
 
-- **Differentiable ranking**: sigmoid-based soft ranking $\hat{R}_i(\mathbf{s}) = \sum_{j \neq i} \sigma\bigl(\tau(s_j - s_i)\bigr)$. Variants: NeuralSort, SoftRank/Probabilistic, SmoothI. $O(n^2)$, suitable for lists up to ~1000 items.
-- **LTR loss functions**: RankNet, LambdaLoss, ApproxNDCG, ListNet, ListMLE (see formulas below).
+- **Differentiable ranking**: sigmoid-based soft ranking $\hat{R}_i(\mathbf{s}) = \sum_{j \neq i} \sigma\bigl(\tau(s_j - s_i)\bigr)$. Additional variants are lightweight heuristics inspired by NeuralSort, probabilistic ranking, and SmoothI. They are $O(n^2)$.
+- **LTR objectives**: RankNet, an NDCG-weighted pairwise loss, ApproxNDCG, and ListNet- and ListMLE-style objectives (see formulas below).
 - **Gradient trainers**: LambdaRank and Ranking SVM with configurable query normalization, cost sensitivity, and score normalization.
 - **IR evaluation metrics**: NDCG, MAP, MRR, Precision@K, Recall@K, ERR, RBP, F-measure, R-Precision, Success@K. Binary and graded relevance.
 - **TREC format parsing**: load standard TREC run files and qrels, batch evaluate, export CSV/JSON.
@@ -19,10 +19,10 @@ Learning-to-rank losses and evaluation.
 | Loss | Formula |
 |------|---------|
 | RankNet | $\mathcal{L} = \sum_{(i,j): y_i > y_j} \log\bigl(1 + e^{-(s_i - s_j)}\bigr)$ |
-| LambdaLoss | RankNet weighted by $\lvert\Delta\text{NDCG}\_{ij}\rvert$ per swapped pair |
+| NDCG-weighted pairwise (`lambda_loss`) | RankNet weighted by $\lvert\Delta\text{NDCG}\_{ij}\rvert$ per swapped pair |
 | ApproxNDCG | $-\sum_i G(y_i) \cdot D\bigl(\hat{\pi}_i(\mathbf{s})\bigr)$ with soft rank $\hat{\pi}$ |
-| ListNet | $\text{KL}\bigl(P_y \;\lVert\; P_s\bigr)$ where $P_z(i) = e^{z_i} / \sum_j e^{z_j}$ |
-| ListMLE | $-\sum\_{k=1}^{n} \log \frac{e^{s\_{\pi(k)}}}{\sum\_{j=k}^{n} e^{s\_{\pi(j)}}}$ (likelihood of ground-truth permutation $\pi$) |
+| ListNet-style (`listnet_loss`) | Cross-entropy between distributions derived from soft ranks |
+| ListMLE-style (`listmle_loss`) | A permutation likelihood computed from soft ranks in target order |
 
 ## Quick start
 
@@ -45,7 +45,7 @@ let loss = ranknet_loss(&predictions, &relevance);
 | Feature    | Default | Description |
 |------------|---------|-------------|
 | `eval`     | yes     | IR evaluation metrics, TREC parsing, batch eval, statistics |
-| `losses`   | yes     | LTR loss functions (RankNet, LambdaLoss, ApproxNDCG, ListNet, ListMLE) |
+| `losses`   | yes     | Pairwise, approximate NDCG, and listwise-style objectives |
 | `gumbel`   | no      | Gumbel-Softmax sampling, relaxed top-k (delegates to `drawset`, pulls `rand`) |
 | `pipeline` | no      | End-to-end retrieval pipeline: tokenize, index, score, rank (pulls `textprep`, `postings`, `rankfns`) |
 | `parallel` | no      | Rayon parallelization for batch operations |
