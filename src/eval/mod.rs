@@ -15,7 +15,10 @@ pub mod statistics;
 pub mod trec;
 pub mod validation;
 
-pub use batch::{evaluate_batch_binary, evaluate_trec_batch, BatchResults, QueryResults};
+pub use batch::{
+    evaluate_all_trec_systems, evaluate_batch_binary, evaluate_trec_batch, evaluate_trec_system,
+    BatchResults, QueryResults, TrecBatchError, TrecSystemResults,
+};
 pub use binary::DegradationMetrics;
 pub use export::export_to_csv;
 pub use statistics::{cohens_d, confidence_interval, paired_t_test, TTestResult};

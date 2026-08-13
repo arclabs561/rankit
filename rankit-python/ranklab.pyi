@@ -469,13 +469,16 @@ def cohens_d(scores_a: _Scores, scores_b: _Scores) -> float:
 # TREC file I/O
 # ---------------------------------------------------------------------------
 
-def load_trec_run(path: str) -> Dict[str, List[Tuple[str, float]]]:
+def load_trec_run(
+    path: str, run_tag: Optional[str] = None
+) -> Dict[str, List[Tuple[str, float]]]:
     """Load a TREC run file.
 
     Format: ``query_id Q0 doc_id rank score run_tag``
 
     Args:
         path: Path to the TREC run file.
+        run_tag: System to load. Required for a multi-system run file.
 
     Returns:
         Dict mapping query_id to list of (doc_id, score) tuples,
@@ -483,6 +486,7 @@ def load_trec_run(path: str) -> Dict[str, List[Tuple[str, float]]]:
 
     Raises:
         IOError: If the file cannot be read or has invalid format.
+        ValueError: If the run tag is absent or ambiguous.
     """
     ...
 
@@ -527,7 +531,10 @@ def evaluate_batch(
     ...
 
 def evaluate_trec(
-    run_path: str, qrels_path: str, metrics: List[str]
+    run_path: str,
+    qrels_path: str,
+    metrics: List[str],
+    run_tag: Optional[str] = None,
 ) -> Dict[str, object]:
     """Evaluate TREC run and qrels files with batch metrics.
 
@@ -535,6 +542,7 @@ def evaluate_trec(
         run_path: Path to a TREC run file.
         qrels_path: Path to a TREC qrels file.
         metrics: Metric names (same as ``evaluate_batch``).
+        run_tag: System to evaluate. Required for a multi-system run file.
 
     Returns:
         Dict with "per_query" (list of dicts with query_id and metrics)
@@ -542,6 +550,7 @@ def evaluate_trec(
 
     Raises:
         IOError: If files cannot be read or have invalid format.
+        ValueError: If the run tag is absent or ambiguous.
     """
     ...
 

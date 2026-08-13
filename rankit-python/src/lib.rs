@@ -744,23 +744,51 @@ fn cohens_d_py(scores_a: &Bound<'_, PyAny>, scores_b: &Bound<'_, PyAny>) -> PyRe
 ///
 /// Args:
 ///     path: Path to the TREC run file.
+///     run_tag: System to load. Required when the file contains multiple run
+///         tags.
 ///
 /// Returns:
 ///     Dict mapping query_id to list of (doc_id, score) tuples, sorted by
 ///     score descending within each query.
 #[pyfunction(name = "load_trec_run")]
-#[pyo3(signature = (path))]
-fn load_trec_run_py(path: &str) -> PyResult<HashMap<String, Vec<(String, f32)>>> {
+#[pyo3(signature = (path, run_tag=None))]
+fn load_trec_run_py(
+    path: &str,
+    run_tag: Option<&str>,
+) -> PyResult<HashMap<String, Vec<(String, f32)>>> {
     let runs = trec::load_trec_runs(path)
         .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
-    let grouped = trec::group_runs_by_query(&runs);
-    // Flatten: for each query, merge all run tags into one list (first tag wins if multiple).
-    let mut result: HashMap<String, Vec<(String, f32)>> = HashMap::new();
-    for (query_id, tag_map) in grouped {
-        // Take the first (or only) run tag's results.
-        if let Some(docs) = tag_map.into_values().next() {
-            result.insert(query_id, docs);
+    let tags: std::collections::BTreeSet<&str> =
+        runs.iter().map(|run| run.run_tag.as_str()).collect();
+    let selected_tag = match (run_tag, tags.len()) {
+        (Some(tag), _) if tags.contains(tag) => tag.to_string(),
+        (Some(tag), _) => {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "TREC run tag '{tag}' was not found"
+            )));
         }
+        (None, 1) => tags
+            .first()
+            .copied()
+            .expect("one tag must be present")
+            .to_string(),
+        (None, 0) => return Ok(HashMap::new()),
+        (None, _) => {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "TREC run file contains multiple systems; specify run_tag",
+            ));
+        }
+    };
+
+    let mut result: HashMap<String, Vec<(String, f32)>> = HashMap::new();
+    for run in runs.into_iter().filter(|run| run.run_tag == selected_tag) {
+        result
+            .entry(run.query_id)
+            .or_default()
+            .push((run.doc_id, run.score));
+    }
+    for docs in result.values_mut() {
+        docs.sort_unstable_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
     }
     Ok(result)
 }
@@ -831,23 +859,43 @@ fn evaluate_batch_py<'py>(
 ///     run_path: Path to a TREC run file.
 ///     qrels_path: Path to a TREC qrels file.
 ///     metrics: List of metric names (same as ``evaluate_batch``).
+///     run_tag: System to evaluate. Required when the file contains multiple
+///         run tags.
 ///
 /// Returns:
 ///     Dict with "per_query" and "aggregated" (same structure as ``evaluate_batch``).
 #[pyfunction(name = "evaluate_trec")]
-#[pyo3(signature = (run_path, qrels_path, metrics))]
+#[pyo3(signature = (run_path, qrels_path, metrics, run_tag=None))]
 fn evaluate_trec_py<'py>(
     py: Python<'py>,
     run_path: &str,
     qrels_path: &str,
     metrics: Vec<String>,
+    run_tag: Option<&str>,
 ) -> PyResult<Bound<'py, pyo3::types::PyDict>> {
     let runs = trec::load_trec_runs(run_path)
         .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
     let qrels = trec::load_qrels(qrels_path)
         .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
     let metric_strs: Vec<&str> = metrics.iter().map(|s| s.as_str()).collect();
-    let results = batch::evaluate_trec_batch(&runs, &qrels, &metric_strs);
+    let tags: std::collections::BTreeSet<&str> =
+        runs.iter().map(|run| run.run_tag.as_str()).collect();
+    let selected_tag = match (run_tag, tags.len()) {
+        (Some(tag), _) => tag,
+        (None, 1) => tags.first().copied().expect("one tag must be present"),
+        (None, 0) => {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "TREC run file contains no systems",
+            ));
+        }
+        (None, _) => {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "TREC run file contains multiple systems; specify run_tag",
+            ));
+        }
+    };
+    let results = batch::evaluate_trec_system(&runs, &qrels, &metric_strs, selected_tag)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
     let per_query = pyo3::types::PyList::empty(py);
     for qr in &results.query_results {

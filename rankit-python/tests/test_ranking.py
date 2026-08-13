@@ -496,6 +496,20 @@ class TestTrecIO:
         with pytest.raises(OSError):
             ranklab.load_trec_run("/nonexistent/path.txt")
 
+    def test_load_trec_run_requires_tag_for_multiple_systems(self, tmp_path):
+        run_file = tmp_path / "run.txt"
+        run_file.write_text(
+            "q1 Q0 b 1 1.0 system-b\n"
+            "q1 Q0 a 1 1.0 system-a\n"
+        )
+
+        with pytest.raises(ValueError, match="specify run_tag"):
+            ranklab.load_trec_run(str(run_file))
+
+        assert ranklab.load_trec_run(str(run_file), run_tag="system-a") == {
+            "q1": [("a", 1.0)]
+        }
+
 
 class TestBatchEvaluation:
     def test_evaluate_batch_basic(self):
@@ -536,3 +550,23 @@ class TestBatchEvaluation:
         assert len(result["per_query"]) == 1
         assert result["per_query"][0]["query_id"] == "q1"
         assert result["aggregated"]["mrr"] > 0.0
+
+    def test_evaluate_trec_requires_explicit_tag_for_multiple_systems(self, tmp_path):
+        run_file = tmp_path / "run.txt"
+        run_file.write_text(
+            "q1 Q0 bad 1 1.0 system-b\n"
+            "q1 Q0 good 1 1.0 system-a\n"
+        )
+        qrels_file = tmp_path / "qrels.txt"
+        qrels_file.write_text("q1 0 good 1\n")
+
+        with pytest.raises(ValueError, match="specify run_tag"):
+            ranklab.evaluate_trec(str(run_file), str(qrels_file), ["precision@1"])
+
+        result = ranklab.evaluate_trec(
+            str(run_file),
+            str(qrels_file),
+            ["precision@1"],
+            run_tag="system-a",
+        )
+        assert result["aggregated"]["precision@1"] == 1.0
