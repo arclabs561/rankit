@@ -3,11 +3,20 @@
 //! - **RankNet**: Pairwise logistic loss (Burges et al., ICML 2005)
 //! - **NDCG-weighted pairwise**: RankNet-style terms weighted by swapped-pair delta NDCG
 //! - **ApproxNDCG**: Differentiable NDCG approximation (Qin & Liu, 2010)
-//! - **ListNet-style**: Listwise cross-entropy over soft-rank distributions
+//! - **ListNet**: Cross-entropy over top-one softmax distributions
 //! - **ListMLE-style**: Permutation likelihood computed from soft ranks
 //! - **SoftSort-style**: A simplified sorting relaxation
 
 use crate::rank::sigmoid;
+
+fn softplus(value: f64) -> f64 {
+    value.max(0.0) + (-value.abs()).exp().ln_1p()
+}
+
+fn logaddexp(left: f64, right: f64) -> f64 {
+    let maximum = left.max(right);
+    maximum + ((left - maximum).exp() + (right - maximum).exp()).ln()
+}
 
 /// SoftSort-inspired ranking heuristic.
 ///
@@ -82,7 +91,7 @@ pub fn ranknet_loss(predictions: &[f64], relevance: &[f64]) -> f64 {
             };
 
             let diff = predictions[higher_idx] - predictions[lower_idx];
-            loss += (1.0 + (-diff).exp()).ln();
+            loss += softplus(-diff);
             pair_count += 1;
         }
     }
@@ -145,7 +154,7 @@ pub fn lambda_loss(predictions: &[f64], relevance: &[f64], k: Option<usize>) -> 
             );
 
             let diff = predictions[higher_idx] - predictions[lower_idx];
-            loss += delta_ndcg.abs() * (1.0 + (-diff).exp()).ln();
+            loss += delta_ndcg.abs() * softplus(-diff);
             pair_count += 1;
         }
     }
@@ -249,9 +258,11 @@ pub fn approx_ndcg_loss(
     1.0 - approx_ndcg(predictions, relevance, regularization_strength, k)
 }
 
-/// ListNet-style listwise ranking loss.
+/// Top-one ListNet cross-entropy.
 ///
 /// From: "Learning to Rank: From Pairwise Approach to Listwise Approach" (ICML 2007)
+/// `regularization_strength` is an inverse temperature: larger values produce
+/// sharper top-one distributions.
 pub fn listnet_loss(predictions: &[f64], targets: &[f64], regularization_strength: f64) -> f64 {
     let n = predictions.len();
 
@@ -259,35 +270,46 @@ pub fn listnet_loss(predictions: &[f64], targets: &[f64], regularization_strengt
         return f64::INFINITY;
     }
 
-    let pred_ranks = crate::rank::soft_rank(predictions, regularization_strength);
-    let target_ranks = crate::rank::soft_rank(targets, regularization_strength);
+    let pred_logits: Vec<_> = predictions
+        .iter()
+        .map(|score| score * regularization_strength)
+        .collect();
+    let target_logits: Vec<_> = targets
+        .iter()
+        .map(|score| score * regularization_strength)
+        .collect();
+    let target_probs = softmax(&target_logits);
+    let pred_log_normalizer = logsumexp(&pred_logits);
 
-    let pred_probs = softmax_from_ranks(&pred_ranks);
-    let target_probs = softmax_from_ranks(&target_ranks);
-
-    let mut loss = 0.0;
-    for i in 0..n {
-        if target_probs[i] > 1e-10 {
-            loss -= target_probs[i] * pred_probs[i].ln();
-        }
-    }
-
-    loss
+    target_probs
+        .iter()
+        .zip(pred_logits)
+        .map(|(target_probability, prediction)| {
+            target_probability * (pred_log_normalizer - prediction)
+        })
+        .sum()
 }
 
-fn softmax_from_ranks(ranks: &[f64]) -> Vec<f64> {
-    let n = ranks.len();
-    if n == 0 {
+fn softmax(values: &[f64]) -> Vec<f64> {
+    if values.is_empty() {
         return vec![];
     }
 
-    let max_rank = ranks.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
-    let exp_sum: f64 = ranks.iter().map(|&r| (-(r - max_rank)).exp()).sum();
-
-    ranks
+    let log_normalizer = logsumexp(values);
+    values
         .iter()
-        .map(|&r| (-(r - max_rank)).exp() / exp_sum)
+        .map(|value| (value - log_normalizer).exp())
         .collect()
+}
+
+fn logsumexp(values: &[f64]) -> f64 {
+    let maximum = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    maximum
+        + values
+            .iter()
+            .map(|value| (value - maximum).exp())
+            .sum::<f64>()
+            .ln()
 }
 
 /// ListMLE-inspired likelihood objective computed from soft ranks.
@@ -305,20 +327,15 @@ pub fn listmle_loss(predictions: &[f64], targets: &[f64], regularization_strengt
 
     let pred_ranks = crate::rank::soft_rank(predictions, regularization_strength);
 
+    let ordered_scores: Vec<_> = target_indices
+        .iter()
+        .map(|&index| pred_ranks[index])
+        .collect();
+    let mut suffix_logsumexp = *ordered_scores.last().unwrap();
     let mut loss = 0.0;
-
-    for i in 0..n {
-        let idx = target_indices[i];
-        let score = pred_ranks[idx];
-
-        let mut denom = 0.0;
-        for &jdx in target_indices.iter().skip(i) {
-            denom += pred_ranks[jdx].exp();
-        }
-
-        if denom > 1e-10 {
-            loss -= score - denom.ln();
-        }
+    for &score in ordered_scores.iter().rev().skip(1) {
+        suffix_logsumexp = logaddexp(score, suffix_logsumexp);
+        loss += suffix_logsumexp - score;
     }
 
     loss
@@ -371,12 +388,27 @@ mod tests {
     }
 
     #[test]
+    fn ranknet_loss_is_stable_for_extreme_margins() {
+        let loss = ranknet_loss(&[-1000.0, 1000.0], &[1.0, 0.0]);
+        assert!(loss.is_finite());
+        assert!((loss - 2000.0).abs() < 1e-12);
+    }
+
+    #[test]
     fn test_lambda_loss() {
         let predictions = vec![0.8, 0.3, 0.6];
         let relevance = vec![2.0, 0.0, 1.0];
         let loss = lambda_loss(&predictions, &relevance, None);
         assert!(loss >= 0.0);
         assert!(loss.is_finite());
+    }
+
+    #[test]
+    fn lambda_loss_is_stable_for_extreme_margins() {
+        let loss = lambda_loss(&[-1000.0, 1000.0], &[1.0, 0.0], None);
+        let expected = 2000.0 * (1.0 - 1.0 / 3.0_f64.log2());
+        assert!(loss.is_finite());
+        assert!((loss - expected).abs() < 1e-12);
     }
 
     #[test]
@@ -390,6 +422,27 @@ mod tests {
     }
 
     #[test]
+    fn listnet_matches_top_one_cross_entropy() {
+        let predictions = [2.0_f64.ln(), 3.0_f64.ln()];
+        let targets = [4.0_f64.ln(), 0.0];
+        let expected = -0.8 * 0.4_f64.ln() - 0.2 * 0.6_f64.ln();
+
+        let actual = listnet_loss(&predictions, &targets, 1.0);
+        assert!((actual - expected).abs() < 1e-12);
+    }
+
+    #[test]
+    fn listnet_is_stable_for_extreme_logits() {
+        let aligned = listnet_loss(&[1000.0, -1000.0], &[1000.0, -1000.0], 1.0);
+        let reversed = listnet_loss(&[-1000.0, 1000.0], &[1000.0, -1000.0], 1.0);
+
+        assert!(aligned.is_finite());
+        assert!(reversed.is_finite());
+        assert!(aligned < 1e-12);
+        assert!((reversed - 2000.0).abs() < 1e-12);
+    }
+
+    #[test]
     fn test_listmle_loss() {
         let predictions = vec![0.1, 0.9, 0.3, 0.7, 0.5];
         let targets = vec![0.0, 1.0, 0.2, 0.8, 0.4];
@@ -397,6 +450,16 @@ mod tests {
         let loss = listmle_loss(&predictions, &targets, 1.0);
         assert!(loss >= 0.0);
         assert!(loss.is_finite());
+    }
+
+    #[test]
+    fn listmle_is_stable_for_long_lists() {
+        let predictions: Vec<_> = (0..800).map(|value| value as f64).collect();
+        let targets = predictions.clone();
+
+        let loss = listmle_loss(&predictions, &targets, 100.0);
+        assert!(loss.is_finite());
+        assert!(loss >= 0.0);
     }
 
     #[test]

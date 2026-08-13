@@ -147,7 +147,7 @@ def lambda_loss(
 def listnet_loss(
     predictions: _Scores, relevance: _Scores, temperature: float = 1.0
 ) -> float:
-    """ListNet loss using top-1 probability distribution (KL divergence).
+    """ListNet cross-entropy over top-one probability distributions.
 
     Args:
         predictions: 1D array of predicted scores.
@@ -165,7 +165,7 @@ def listnet_loss(
 def listmle_loss(
     predictions: _Scores, relevance: _Scores, temperature: float = 1.0
 ) -> float:
-    """ListMLE loss: likelihood loss for permutation learning.
+    """ListMLE-inspired likelihood computed from sigmoid soft ranks.
 
     Args:
         predictions: 1D array of predicted scores.

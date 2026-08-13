@@ -118,6 +118,22 @@ class TestLosses:
         loss = ranklab.listnet_loss(predictions, relevance, temperature=1.0)
         assert loss >= 0.0
 
+    def test_listnet_matches_top_one_cross_entropy(self):
+        predictions = [np.log(2.0), np.log(3.0)]
+        relevance = [np.log(4.0), 0.0]
+        expected = -0.8 * np.log(0.4) - 0.2 * np.log(0.6)
+
+        actual = ranklab.listnet_loss(predictions, relevance, temperature=1.0)
+        assert actual == pytest.approx(expected)
+
+    def test_listnet_temperature_controls_smoothing(self):
+        predictions = [1.0, -1.0]
+        relevance = [1.0, -1.0]
+        sharp = ranklab.listnet_loss(predictions, relevance, temperature=0.1)
+        smooth = ranklab.listnet_loss(predictions, relevance, temperature=10.0)
+
+        assert sharp < smooth
+
     def test_listmle_loss(self):
         predictions = [0.1, 0.9, 0.3, 0.7, 0.5]
         relevance = [0.0, 1.0, 0.2, 0.8, 0.4]

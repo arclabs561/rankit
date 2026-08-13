@@ -40,8 +40,8 @@ score = ranklab.ndcg(ranked, qrels, k=3)
 | `ranknet_loss` | RankNet pairwise cross-entropy loss |
 | `approx_ndcg` | Differentiable NDCG approximation via softmax |
 | `lambda_loss` | LambdaLoss ranking loss |
-| `listnet_loss` | ListNet top-1 probability loss (KL divergence) |
-| `listmle_loss` | ListMLE likelihood loss for permutation learning |
+| `listnet_loss` | ListNet cross-entropy over top-one probabilities |
+| `listmle_loss` | ListMLE-inspired likelihood over sigmoid soft ranks |
 | `compute_lambdarank_gradients` | Per-document LambdaRank gradients |
 | `compute_ranking_svm_gradients` | Per-document RankingSVM gradients |
 | `ndcg` | Normalized Discounted Cumulative Gain at k |

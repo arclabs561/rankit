@@ -7,7 +7,7 @@
 //! - **Differentiable ranking**: sigmoid-based soft ranking and lightweight
 //!   variants inspired by NeuralSort, probabilistic ranking, and SmoothI.
 //! - **LTR objectives**: RankNet, an NDCG-weighted pairwise objective,
-//!   ApproxNDCG, and ListNet- and ListMLE-style objectives.
+//!   ApproxNDCG, top-one ListNet, and a ListMLE-inspired objective.
 //! - **Trainers**: LambdaRank and Ranking SVM with query normalization, cost
 //!   sensitivity, and score normalization options.
 //! - **Evaluation** (feature `eval`): NDCG, MAP, MRR, Precision/Recall@K, ERR,

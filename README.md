@@ -8,7 +8,7 @@ Learning-to-rank losses and evaluation.
 ## What it does
 
 - **Differentiable ranking**: sigmoid-based soft ranking $\hat{R}_i(\mathbf{s}) = \sum_{j \neq i} \sigma\bigl(\tau(s_j - s_i)\bigr)$. Additional variants are lightweight heuristics inspired by NeuralSort, probabilistic ranking, and SmoothI. They are $O(n^2)$.
-- **LTR objectives**: RankNet, an NDCG-weighted pairwise loss, ApproxNDCG, and ListNet- and ListMLE-style objectives (see formulas below).
+- **LTR objectives**: RankNet, an NDCG-weighted pairwise loss, ApproxNDCG, top-one ListNet, and a ListMLE-inspired objective (see formulas below).
 - **Gradient trainers**: LambdaRank and Ranking SVM with configurable query normalization, cost sensitivity, and score normalization.
 - **IR evaluation metrics**: NDCG, MAP, MRR, Precision@K, Recall@K, ERR, RBP, F-measure, R-Precision, Success@K. Binary and graded relevance.
 - **TREC format parsing**: load standard TREC run files and qrels, batch evaluate, export CSV/JSON.
@@ -21,7 +21,7 @@ Learning-to-rank losses and evaluation.
 | RankNet | $\mathcal{L} = \sum_{(i,j): y_i > y_j} \log\bigl(1 + e^{-(s_i - s_j)}\bigr)$ |
 | NDCG-weighted pairwise (`lambda_loss`) | RankNet weighted by $\lvert\Delta\text{NDCG}\_{ij}\rvert$ per swapped pair |
 | ApproxNDCG | $-\sum_i G(y_i) \cdot D\bigl(\hat{\pi}_i(\mathbf{s})\bigr)$ with soft rank $\hat{\pi}$ |
-| ListNet-style (`listnet_loss`) | Cross-entropy between distributions derived from soft ranks |
+| ListNet (`listnet_loss`) | Cross-entropy between top-one softmax distributions |
 | ListMLE-style (`listmle_loss`) | A permutation likelihood computed from soft ranks in target order |
 
 ## Quick start

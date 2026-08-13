@@ -224,7 +224,7 @@ fn lambda_loss_py(
     Ok(lambda_loss(&predictions, &relevance, k))
 }
 
-/// ListNet loss using top-1 probability distribution (KL divergence).
+/// ListNet cross-entropy over top-one probability distributions.
 ///
 /// Args:
 ///     predictions: 1D array of predicted scores.
@@ -247,10 +247,10 @@ fn listnet_loss_py(
             format!("predictions length ({}) != relevance length ({})", predictions.len(), relevance.len())
         ));
     }
-    Ok(listnet_loss(&predictions, &relevance, temperature))
+    Ok(listnet_loss(&predictions, &relevance, 1.0 / temperature))
 }
 
-/// ListMLE loss: likelihood loss for permutation learning.
+/// ListMLE-inspired likelihood computed from sigmoid soft ranks.
 ///
 /// Args:
 ///     predictions: 1D array of predicted scores.
@@ -273,7 +273,7 @@ fn listmle_loss_py(
             format!("predictions length ({}) != relevance length ({})", predictions.len(), relevance.len())
         ));
     }
-    Ok(listmle_loss(&predictions, &relevance, temperature))
+    Ok(listmle_loss(&predictions, &relevance, 1.0 / temperature))
 }
 
 // ---------------------------------------------------------------------------
