@@ -98,8 +98,8 @@ pub fn compute_ranking_svm_gradients(
 
                 let gradient_contribution = params.c * mu * tau;
 
-                gradients[high_idx] += gradient_contribution;
-                gradients[low_idx] -= gradient_contribution;
+                gradients[high_idx] -= gradient_contribution;
+                gradients[low_idx] += gradient_contribution;
             }
         }
     }
@@ -161,8 +161,79 @@ mod tests {
         let gradients = compute_ranking_svm_gradients(&scores, &relevance, params).unwrap();
 
         assert_eq!(gradients.len(), 3);
-        assert!(gradients[0] > 0.0);
-        assert!(gradients[1] < 0.0);
+        assert!(gradients[0] < 0.0);
+        assert!(gradients[1] > 0.0);
+    }
+
+    fn ranking_hinge_objective(scores: &[f32], relevance: &[f32], c: f32) -> f32 {
+        let mut loss = 0.0;
+        for i in 0..scores.len() {
+            for j in (i + 1)..scores.len() {
+                if relevance[i] == relevance[j] {
+                    continue;
+                }
+                let (high, low) = if relevance[i] > relevance[j] {
+                    (i, j)
+                } else {
+                    (j, i)
+                };
+                loss += c * (1.0 - (scores[high] - scores[low])).max(0.0);
+            }
+        }
+        loss
+    }
+
+    #[test]
+    fn gradients_match_central_finite_differences() {
+        let scores = [0.2, -0.1, 0.4];
+        let relevance = [2.0, 0.0, 1.0];
+        let params = RankingSVMParams {
+            c: 1.7,
+            query_normalization: false,
+            cost_sensitivity: false,
+            epsilon: 1e-10,
+        };
+        let actual = compute_ranking_svm_gradients(&scores, &relevance, params).unwrap();
+        let step = 1e-3;
+
+        for index in 0..scores.len() {
+            let mut plus = scores;
+            let mut minus = scores;
+            plus[index] += step;
+            minus[index] -= step;
+            let expected = (ranking_hinge_objective(&plus, &relevance, params.c)
+                - ranking_hinge_objective(&minus, &relevance, params.c))
+                / (2.0 * step);
+            assert!(
+                (actual[index] - expected).abs() < 1e-3,
+                "gradient[{index}] = {}, finite difference = {expected}",
+                actual[index]
+            );
+        }
+    }
+
+    #[test]
+    fn gradient_descent_step_increases_preferred_margin_and_reduces_loss() {
+        let scores = [0.2, 0.0];
+        let relevance = [1.0, 0.0];
+        let params = RankingSVMParams {
+            c: 1.0,
+            query_normalization: false,
+            cost_sensitivity: false,
+            epsilon: 1e-10,
+        };
+        let gradient = compute_ranking_svm_gradients(&scores, &relevance, params).unwrap();
+        let learning_rate = 0.1;
+        let updated = [
+            scores[0] - learning_rate * gradient[0],
+            scores[1] - learning_rate * gradient[1],
+        ];
+
+        assert!(updated[0] - updated[1] > scores[0] - scores[1]);
+        assert!(
+            ranking_hinge_objective(&updated, &relevance, params.c)
+                < ranking_hinge_objective(&scores, &relevance, params.c)
+        );
     }
 
     #[test]
