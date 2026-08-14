@@ -35,6 +35,8 @@
 
 use thiserror::Error;
 
+use crate::{neural_sort, soft_sort, SortingError};
+
 const PROBABILITY_SUM_TOLERANCE: f64 = 1e-12;
 
 /// Configuration for the top-k cross-entropy loss.
@@ -167,6 +169,296 @@ pub enum TopKComputeError {
         /// Number of labels.
         labels: usize,
     },
+}
+
+/// Full-matrix relaxation used by [`DifferentiableTopKCrossEntropyLoss`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TopKRelaxation {
+    /// NeuralSort's row-stochastic permutation relaxation.
+    NeuralSort,
+    /// SoftSort with absolute-distance logits.
+    SoftSort,
+}
+
+/// Treatment of the top-1 component in the differentiable loss.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Top1Mode {
+    /// Derive every top-k inclusion probability from the relaxed sort matrix.
+    Relaxed,
+    /// Use ordinary softmax probabilities for the top-1 component.
+    SoftmaxMixture,
+}
+
+/// Configuration for the scalar reference implementation of differentiable
+/// top-k cross-entropy.
+#[derive(Debug, Clone)]
+pub struct DifferentiableTopKConfig {
+    /// Distribution over top-k objectives. Trailing zero entries are ignored.
+    pub p_k: Vec<f64>,
+    /// Inverse temperature (steepness) of the sorting relaxation.
+    pub inverse_temperature: f64,
+    /// Optional number of logits retained before applying the full matrix sort.
+    pub m: Option<usize>,
+    /// Differentiable sorting relaxation.
+    pub relaxation: TopKRelaxation,
+    /// Treatment of the top-1 term.
+    pub top1_mode: Top1Mode,
+}
+
+impl DifferentiableTopKConfig {
+    /// Validate the distribution, inverse temperature, and truncation.
+    pub fn validate(&self) -> Result<(), DifferentiableTopKConfigError> {
+        if self.p_k.is_empty() {
+            return Err(DifferentiableTopKConfigError::EmptyDistribution);
+        }
+        for (index, &probability) in self.p_k.iter().enumerate() {
+            if !probability.is_finite() {
+                return Err(DifferentiableTopKConfigError::NonFiniteProbability {
+                    index,
+                    probability,
+                });
+            }
+            if probability < 0.0 {
+                return Err(DifferentiableTopKConfigError::NegativeProbability {
+                    index,
+                    probability,
+                });
+            }
+        }
+        let sum: f64 = self.p_k.iter().sum();
+        if (sum - 1.0).abs() > PROBABILITY_SUM_TOLERANCE {
+            return Err(DifferentiableTopKConfigError::NonNormalizedDistribution { sum });
+        }
+        if !self.inverse_temperature.is_finite()
+            || self.inverse_temperature <= 0.0
+            || !(1.0 / self.inverse_temperature).is_finite()
+        {
+            return Err(DifferentiableTopKConfigError::InvalidInverseTemperature(
+                self.inverse_temperature,
+            ));
+        }
+
+        let effective_k = self
+            .p_k
+            .iter()
+            .rposition(|&probability| probability > 0.0)
+            .map_or(0, |index| index + 1);
+        if let Some(m) = self.m {
+            if m < effective_k {
+                return Err(DifferentiableTopKConfigError::InvalidTruncation { m, effective_k });
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Invalid differentiable top-k cross-entropy configuration.
+#[derive(Debug, Clone, Error, PartialEq)]
+#[non_exhaustive]
+pub enum DifferentiableTopKConfigError {
+    /// The distribution contains no top-k positions.
+    #[error("p_k must not be empty")]
+    EmptyDistribution,
+    /// A distribution entry is NaN or infinite.
+    #[error("p_k[{index}] must be finite, got {probability}")]
+    NonFiniteProbability {
+        /// Index of the invalid entry.
+        index: usize,
+        /// Invalid probability.
+        probability: f64,
+    },
+    /// A distribution entry is negative.
+    #[error("p_k[{index}] must be non-negative, got {probability}")]
+    NegativeProbability {
+        /// Index of the invalid entry.
+        index: usize,
+        /// Invalid probability.
+        probability: f64,
+    },
+    /// The distribution does not sum to one.
+    #[error("p_k must sum to 1 (within {PROBABILITY_SUM_TOLERANCE}), got {sum}")]
+    NonNormalizedDistribution {
+        /// Observed sum.
+        sum: f64,
+    },
+    /// The inverse temperature is not finite and strictly positive.
+    #[error("inverse_temperature must have a finite positive reciprocal, got {0}")]
+    InvalidInverseTemperature(f64),
+    /// The truncation cannot represent the largest top-k objective with weight.
+    #[error("m must be at least the effective k ({effective_k}), got {m}")]
+    InvalidTruncation {
+        /// Requested truncation.
+        m: usize,
+        /// Last top-k position with nonzero weight.
+        effective_k: usize,
+    },
+}
+
+/// Invalid input to a differentiable top-k cross-entropy computation.
+#[derive(Debug, Clone, Error, PartialEq)]
+#[non_exhaustive]
+pub enum DifferentiableTopKComputeError {
+    /// A sample has no class logits.
+    #[error("logits must not be empty")]
+    EmptyLogits,
+    /// The label does not identify one of the sample's classes.
+    #[error("label {label} is out of bounds for {classes} classes")]
+    LabelOutOfBounds {
+        /// Invalid label.
+        label: usize,
+        /// Number of available classes.
+        classes: usize,
+    },
+    /// A logit is NaN or infinite.
+    #[error("logit at index {index} must be finite, got {value}")]
+    NonFiniteLogit {
+        /// Index of the invalid logit.
+        index: usize,
+        /// Invalid logit.
+        value: f64,
+    },
+    /// The configured objective requests a k larger than the class count.
+    #[error("effective k ({effective_k}) exceeds the number of classes ({classes})")]
+    TooFewClasses {
+        /// Last top-k position with nonzero weight.
+        effective_k: usize,
+        /// Number of available classes.
+        classes: usize,
+    },
+    /// The selected sorting relaxation rejected its input.
+    #[error(transparent)]
+    Sorting(#[from] SortingError),
+}
+
+/// Scalar, reference-faithful differentiable top-k cross-entropy.
+///
+/// This implementation composes Rankit's full-matrix [`neural_sort`] and
+/// [`soft_sort`] operators following Petersen et al.'s loss construction. It
+/// returns only an `f64` loss and does not provide automatic differentiation.
+/// [`TopKCrossEntropyLoss`] remains available as the legacy lightweight
+/// heuristic.
+#[derive(Debug, Clone)]
+pub struct DifferentiableTopKCrossEntropyLoss {
+    config: DifferentiableTopKConfig,
+    effective_k: usize,
+}
+
+impl DifferentiableTopKCrossEntropyLoss {
+    /// Create a loss after validating its configuration.
+    pub fn try_new(
+        config: DifferentiableTopKConfig,
+    ) -> Result<Self, DifferentiableTopKConfigError> {
+        config.validate()?;
+        let effective_k = config
+            .p_k
+            .iter()
+            .rposition(|&probability| probability > 0.0)
+            .map_or(0, |index| index + 1);
+        Ok(Self {
+            config,
+            effective_k,
+        })
+    }
+
+    /// Compute the loss for one sample.
+    pub fn compute(
+        &self,
+        logits: &[f64],
+        label: usize,
+    ) -> Result<f64, DifferentiableTopKComputeError> {
+        if logits.is_empty() {
+            return Err(DifferentiableTopKComputeError::EmptyLogits);
+        }
+        if label >= logits.len() {
+            return Err(DifferentiableTopKComputeError::LabelOutOfBounds {
+                label,
+                classes: logits.len(),
+            });
+        }
+        if let Some((index, &value)) = logits
+            .iter()
+            .enumerate()
+            .find(|(_, value)| !value.is_finite())
+        {
+            return Err(DifferentiableTopKComputeError::NonFiniteLogit { index, value });
+        }
+        if self.effective_k > logits.len() {
+            return Err(DifferentiableTopKComputeError::TooFewClasses {
+                effective_k: self.effective_k,
+                classes: logits.len(),
+            });
+        }
+
+        let (selected, selected_label) = retain_true_label(logits, label, self.config.m);
+        let temperature = 1.0 / self.config.inverse_temperature;
+        let permutation = match self.config.relaxation {
+            TopKRelaxation::NeuralSort => neural_sort(&selected, temperature)?,
+            TopKRelaxation::SoftSort => soft_sort(&selected, temperature)?,
+        };
+
+        let probability = differentiable_topk_probability(
+            &selected,
+            selected_label,
+            &permutation,
+            &self.config.p_k[..self.effective_k],
+            self.config.top1_mode,
+        );
+
+        // Match the official implementation's bounded affine stabilization.
+        Ok(-(probability * (1.0 - 2e-7) + 1e-7).ln())
+    }
+}
+
+fn differentiable_topk_probability(
+    logits: &[f64],
+    label: usize,
+    permutation: &[Vec<f64>],
+    p_k: &[f64],
+    top1_mode: Top1Mode,
+) -> f64 {
+    let mut probability = 0.0;
+    for (index, &weight) in p_k.iter().enumerate() {
+        if weight == 0.0 {
+            continue;
+        }
+        let k = index + 1;
+        let inclusion = if k == 1 && top1_mode == Top1Mode::SoftmaxMixture {
+            softmax_probability(logits, label)
+        } else {
+            permutation[..k].iter().map(|row| row[label]).sum()
+        };
+        probability += weight * inclusion;
+    }
+    probability
+}
+
+fn retain_true_label(logits: &[f64], label: usize, m: Option<usize>) -> (Vec<f64>, usize) {
+    let Some(m) = m.filter(|&m| m < logits.len()) else {
+        return (logits.to_vec(), label);
+    };
+    let mut false_logits: Vec<(usize, f64)> = logits
+        .iter()
+        .copied()
+        .enumerate()
+        .filter(|(index, _)| *index != label)
+        .collect();
+    false_logits.sort_by(|left, right| {
+        right
+            .1
+            .total_cmp(&left.1)
+            .then_with(|| left.0.cmp(&right.0))
+    });
+
+    let mut selected = Vec::with_capacity(m);
+    selected.push(logits[label]);
+    selected.extend(false_logits.into_iter().take(m - 1).map(|(_, value)| value));
+    (selected, 0)
+}
+
+fn softmax_probability(logits: &[f64], label: usize) -> f64 {
+    let max = logits.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let denominator: f64 = logits.iter().map(|&value| (value - max).exp()).sum();
+    (logits[label] - max).exp() / denominator
 }
 
 /// Top-k cross-entropy loss.
@@ -742,5 +1034,188 @@ mod tests {
             loss.try_compute_batch(&logits, &labels).unwrap(),
             loss.compute_batch(&logits, &labels)
         );
+    }
+
+    fn reference_loss(
+        p_k: Vec<f64>,
+        inverse_temperature: f64,
+        m: Option<usize>,
+        relaxation: TopKRelaxation,
+        top1_mode: Top1Mode,
+    ) -> DifferentiableTopKCrossEntropyLoss {
+        DifferentiableTopKCrossEntropyLoss::try_new(DifferentiableTopKConfig {
+            p_k,
+            inverse_temperature,
+            m,
+            relaxation,
+            top1_mode,
+        })
+        .unwrap()
+    }
+
+    fn assert_close(left: f64, right: f64) {
+        assert!((left - right).abs() <= 1e-12, "{left} != {right}");
+    }
+
+    #[test]
+    fn reference_loss_matches_direct_full_matrix_composition() {
+        let logits = [1.5, -0.25, 0.75, 2.0];
+        let p_k = [0.25, 0.0, 0.75];
+        for relaxation in [TopKRelaxation::NeuralSort, TopKRelaxation::SoftSort] {
+            let matrix = match relaxation {
+                TopKRelaxation::NeuralSort => neural_sort(&logits, 0.5).unwrap(),
+                TopKRelaxation::SoftSort => soft_sort(&logits, 0.5).unwrap(),
+            };
+            let probability =
+                p_k[0] * matrix[0][2] + p_k[2] * matrix[..3].iter().map(|row| row[2]).sum::<f64>();
+            let expected = -(probability * (1.0 - 2e-7) + 1e-7).ln();
+            let actual = reference_loss(p_k.to_vec(), 2.0, None, relaxation, Top1Mode::Relaxed)
+                .compute(&logits, 2)
+                .unwrap();
+            assert_close(actual, expected);
+        }
+    }
+
+    #[test]
+    fn explicit_matrix_uses_descending_rows_as_topk_positions() {
+        let matrix = vec![
+            vec![0.8, 0.1, 0.1],
+            vec![0.1, 0.6, 0.3],
+            vec![0.1, 0.3, 0.6],
+        ];
+        let probability = differentiable_topk_probability(
+            &[2.0, 1.0, 0.0],
+            1,
+            &matrix,
+            &[0.25, 0.75],
+            Top1Mode::Relaxed,
+        );
+        assert_close(probability, 0.25 * 0.1 + 0.75 * 0.7);
+    }
+
+    #[test]
+    fn softmax_mixture_top1_matches_official_stabilized_formula() {
+        let logits = [2.0, 0.0, -1.0];
+        let probability = softmax_probability(&logits, 0);
+        let expected = -(probability * (1.0 - 2e-7) + 1e-7).ln();
+        let actual = reference_loss(
+            vec![1.0],
+            3.0,
+            None,
+            TopKRelaxation::NeuralSort,
+            Top1Mode::SoftmaxMixture,
+        )
+        .compute(&logits, 0)
+        .unwrap();
+        assert_close(actual, expected);
+    }
+
+    #[test]
+    fn truncation_retains_true_label_and_highest_false_logits() {
+        let logits = [9.0, 8.0, -20.0, 7.0];
+        let truncated = reference_loss(
+            vec![0.0, 1.0],
+            2.0,
+            Some(2),
+            TopKRelaxation::SoftSort,
+            Top1Mode::Relaxed,
+        )
+        .compute(&logits, 2)
+        .unwrap();
+        let explicit = reference_loss(
+            vec![0.0, 1.0],
+            2.0,
+            None,
+            TopKRelaxation::SoftSort,
+            Top1Mode::Relaxed,
+        )
+        .compute(&[-20.0, 9.0], 0)
+        .unwrap();
+        assert_close(truncated, explicit);
+    }
+
+    #[test]
+    fn trailing_zero_weights_do_not_increase_effective_k() {
+        let with_zeros = reference_loss(
+            vec![0.5, 0.5, 0.0, 0.0],
+            1.5,
+            Some(2),
+            TopKRelaxation::NeuralSort,
+            Top1Mode::Relaxed,
+        );
+        let trimmed = reference_loss(
+            vec![0.5, 0.5],
+            1.5,
+            Some(2),
+            TopKRelaxation::NeuralSort,
+            Top1Mode::Relaxed,
+        );
+        let logits = [0.25, 2.0, -1.0, 0.75];
+        assert_close(
+            with_zeros.compute(&logits, 0).unwrap(),
+            trimmed.compute(&logits, 0).unwrap(),
+        );
+    }
+
+    #[test]
+    fn reference_loss_is_permutation_and_translation_invariant() {
+        for relaxation in [TopKRelaxation::NeuralSort, TopKRelaxation::SoftSort] {
+            let loss = reference_loss(
+                vec![0.2, 0.3, 0.5],
+                0.8,
+                None,
+                relaxation,
+                Top1Mode::SoftmaxMixture,
+            );
+            let original = loss.compute(&[1.0, -2.0, 0.5, 3.0], 2).unwrap();
+            let permuted = loss.compute(&[3.0, 0.5, 1.0, -2.0], 1).unwrap();
+            let translated = loss.compute(&[18.0, 15.0, 17.5, 20.0], 2).unwrap();
+            assert_close(original, permuted);
+            assert_close(original, translated);
+        }
+    }
+
+    #[test]
+    fn ties_and_extreme_finite_logits_produce_finite_losses() {
+        for relaxation in [TopKRelaxation::NeuralSort, TopKRelaxation::SoftSort] {
+            let loss = reference_loss(vec![0.5, 0.5], 4.0, None, relaxation, Top1Mode::Relaxed);
+            assert_close(
+                loss.compute(&[1.0, 1.0, 0.0], 0).unwrap(),
+                loss.compute(&[1.0, 1.0, 0.0], 1).unwrap(),
+            );
+            assert!(loss.compute(&[1e150, 0.0, -1e150], 1).unwrap().is_finite());
+        }
+    }
+
+    #[test]
+    fn reference_loss_rejects_invalid_configuration_and_inputs() {
+        let error = DifferentiableTopKCrossEntropyLoss::try_new(DifferentiableTopKConfig {
+            p_k: vec![0.0, 1.0],
+            inverse_temperature: 1.0,
+            m: Some(1),
+            relaxation: TopKRelaxation::SoftSort,
+            top1_mode: Top1Mode::Relaxed,
+        })
+        .unwrap_err();
+        assert_eq!(
+            error,
+            DifferentiableTopKConfigError::InvalidTruncation {
+                m: 1,
+                effective_k: 2
+            }
+        );
+
+        let loss = reference_loss(
+            vec![1.0],
+            1.0,
+            None,
+            TopKRelaxation::SoftSort,
+            Top1Mode::Relaxed,
+        );
+        assert!(matches!(
+            loss.compute(&[0.0, f64::NAN], 0),
+            Err(DifferentiableTopKComputeError::NonFiniteLogit { index: 1, value })
+                if value.is_nan()
+        ));
     }
 }
