@@ -17,17 +17,22 @@
 //! # Quick start
 //!
 //! ```rust
-//! use rankit::{soft_rank, ranknet_loss};
+//! use rankit::soft_rank;
+//! # #[cfg(feature = "losses")]
+//! use rankit::ranknet_loss;
 //!
 //! // Differentiable ranking
 //! let scores = vec![5.0, 1.0, 2.0, 4.0, 3.0];
 //! let ranks = soft_rank(&scores, 1.0);
 //! // ranks[0] is highest (~4.0), ranks[1] is lowest (~0.0)
 //!
-//! // RankNet pairwise loss
+//! # #[cfg(feature = "losses")]
+//! # {
+//! // RankNet pairwise loss (with the default `losses` feature)
 //! let predictions = vec![0.8, 0.3, 0.6];
 //! let relevance = vec![2.0, 0.0, 1.0];
 //! let loss = ranknet_loss(&predictions, &relevance);
+//! # }
 //! ```
 //!
 //! # Feature flags

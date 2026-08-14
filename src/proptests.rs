@@ -133,6 +133,7 @@ proptest! {
     }
 
     #[test]
+    #[cfg(feature = "losses")]
     fn ranknet_loss_nonnegative(
         predictions in prop::collection::vec(-10.0..10.0_f64, 2..10),
         relevance in prop::collection::vec(0.0..5.0_f64, 2..10),

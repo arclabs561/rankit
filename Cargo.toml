@@ -68,9 +68,30 @@ required-features = ["pipeline", "eval"]
 
 [[example]]
 name = "train_with_schedule"
+required-features = ["losses"]
+
+[[example]]
+name = "neural_surrogate_loss"
+required-features = ["losses"]
+
+[[example]]
+name = "eval_metrics"
+required-features = ["eval"]
+
+[[example]]
+name = "ltr_lightgbm_train_eval"
+required-features = ["eval"]
 
 [[example]]
 name = "ltr_significance"
+required-features = ["eval"]
+
+[[test]]
+name = "recent_regression_oracles"
+required-features = ["losses"]
+
+[[test]]
+name = "rosetta_rankit"
 required-features = ["eval"]
 
 [workspace]

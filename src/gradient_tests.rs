@@ -1,6 +1,7 @@
 //! Finite-difference gradient correctness tests.
 
 use crate::gradients::soft_rank_gradient;
+#[cfg(feature = "losses")]
 use crate::losses::{approx_ndcg_loss, ranknet_loss};
 use crate::rank::soft_rank;
 
@@ -28,6 +29,7 @@ fn numerical_jacobian(values: &[f64], reg: f64) -> Vec<Vec<f64>> {
 }
 
 /// Numerically compute the gradient of a scalar loss w.r.t. inputs.
+#[cfg(feature = "losses")]
 fn numerical_gradient(values: &[f64], loss_fn: impl Fn(&[f64]) -> f64) -> Vec<f64> {
     let n = values.len();
     let mut grad = vec![0.0; n];
@@ -89,6 +91,7 @@ fn soft_rank_gradient_matches_finite_differences() {
 // ---------------------------------------------------------------------------
 
 #[test]
+#[cfg(feature = "losses")]
 fn ranknet_gradient_direction_reduces_loss() {
     let relevances: Vec<Vec<f64>> = vec![
         vec![2.0, 0.0, 1.0, 3.0, 1.0],
@@ -130,6 +133,7 @@ fn ranknet_gradient_direction_reduces_loss() {
 // ---------------------------------------------------------------------------
 
 #[test]
+#[cfg(feature = "losses")]
 fn perfect_ranking_near_zero_approx_ndcg() {
     // Predictions perfectly ordered by relevance (highest prediction = highest relevance).
     let relevance = vec![3.0, 2.0, 1.0, 0.0];
@@ -145,6 +149,7 @@ fn perfect_ranking_near_zero_approx_ndcg() {
 }
 
 #[test]
+#[cfg(feature = "losses")]
 fn perfect_ranking_near_zero_gradients() {
     // When the ranking is already perfect, the gradient of the loss should be
     // small -- there is little incentive to move any score.
