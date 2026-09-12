@@ -3,11 +3,13 @@
 //! Delegates to [`drawset`] for correct implementations of the Gumbel-Softmax
 //! trick and the iterated masked-softmax relaxed top-k (Kool et al., 2019).
 //!
-//! Requires the `gumbel` feature (enables `rand` + `drawset` dependencies).
+//! Requires the `gumbel` feature (enables `rand` + `drawset` dependencies),
+//! which needs Rust 1.75. These wrappers return plain numeric values and do
+//! not create an automatic-differentiation graph.
 
 use rand::Rng;
 
-/// Gumbel-Softmax: differentiable sampling from categorical distribution.
+/// Gumbel-Softmax numeric relaxation of categorical sampling.
 ///
 /// From: "Categorical Reparameterization with Gumbel-Softmax" (Jang et al., ICLR 2017)
 ///
