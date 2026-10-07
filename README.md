@@ -27,7 +27,7 @@ Learning-to-rank losses and evaluation.
 
 Here $P$ contains oriented pairs with $y_i > y_j$, excluding relevance differences below $10^{-10}$. RankNet returns zero when $P$ is empty.
 
-Requires Rust 1.87 or newer for the default and no-default-feature builds.
+Requires Rust 1.89 or newer for the default and no-default-feature builds.
 Neither build enables the optional `innr` backend in `rankops`.
 
 ## Quick start
