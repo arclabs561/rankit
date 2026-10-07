@@ -19,11 +19,16 @@ Learning-to-rank losses and evaluation.
 
 | Loss | Formula |
 |------|---------|
-| RankNet | $\mathcal{L} = \sum_{(i,j): y_i > y_j} \log\bigl(1 + e^{-(s_i - s_j)}\bigr)$ |
+| RankNet | $\mathcal{L} = \frac{1}{\lvert P\rvert}\sum_{(i,j)\in P} \log\bigl(1 + e^{-(s_i - s_j)}\bigr)$ |
 | NDCG-weighted pairwise (`lambda_loss`) | RankNet weighted by $\lvert\Delta\text{NDCG}\_{ij}\rvert$ per swapped pair |
 | ApproxNDCG | $-\sum_i G(y_i) \cdot D\bigl(\hat{\pi}_i(\mathbf{s})\bigr)$ with soft rank $\hat{\pi}$ |
 | ListNet (`listnet_loss`) | Cross-entropy between top-one softmax distributions |
 | ListMLE-style (`listmle_loss`) | A permutation likelihood computed from soft ranks in target order |
+
+Here $P$ contains oriented pairs with $y_i > y_j$, excluding relevance differences below $10^{-10}$. RankNet returns zero when $P$ is empty.
+
+Requires Rust 1.87 or newer for the default and no-default-feature builds.
+Neither build enables the optional `innr` backend in `rankops`.
 
 ## Quick start
 

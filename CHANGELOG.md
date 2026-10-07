@@ -7,10 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-10-06
+
 ### Changed
 
+- Use `rankops` 0.2 with default features disabled: evaluation uses its metrics
+  without pulling in the optional `innr` backend.
+- Correct the declared minimum Rust version to 1.87, matching the existing
+  dependency requirements, and check external consumer builds in CI.
 - Raised the optional `gumbel` dependency minimum to `drawset` 0.1.2 and
   documented its existing Rust 1.75 requirement.
+
+### Fixed
+
+- Show the mean over relevance pairs in the README RankNet formula, matching
+  the implemented loss.
+- Align the Python binding source compiler requirement with the Rust crate.
 
 ## [0.1.6] - 2026-07-07
 
