@@ -232,10 +232,17 @@ pub fn compute_lambdarank_gradients(
         1.0
     };
 
+    // Ranks come from the current scores (descending, ties by input order),
+    // not from input order: delta NDCG and the top-k truncation are defined
+    // on the ranking the model currently produces (Burges 2010, Section 4.2).
+    let mut order: Vec<usize> = (0..n).collect();
+    order.sort_by(|&a, &b| scores[b].total_cmp(&scores[a]));
+    let ranked_relevance: Vec<f32> = order.iter().map(|&doc| relevance[doc]).collect();
+
     let mut valid_pairs = 0;
     for i in 0..n.min(k_trunc) {
         for j in (i + 1)..n {
-            if (relevance[i] - relevance[j]).abs() > 1e-10 {
+            if (ranked_relevance[i] - ranked_relevance[j]).abs() > 1e-10 {
                 valid_pairs += 1;
             }
         }
@@ -249,19 +256,19 @@ pub fn compute_lambdarank_gradients(
 
     for i in 0..n.min(k_trunc) {
         for j in (i + 1)..n {
-            let rel_diff = relevance[i] - relevance[j];
+            let rel_diff = ranked_relevance[i] - ranked_relevance[j];
             if rel_diff.abs() < 1e-10 {
                 continue;
             }
 
             let (high_idx, low_idx, high_rank, low_rank) = if rel_diff > 0.0 {
-                (i, j, i, j)
+                (order[i], order[j], i, j)
             } else {
-                (j, i, j, i)
+                (order[j], order[i], j, i)
             };
 
             let delta = delta_ndcg(
-                relevance,
+                &ranked_relevance,
                 high_rank,
                 low_rank,
                 k,
@@ -416,6 +423,89 @@ mod tests {
 
         assert_eq!(lambdas.len(), 3);
         assert!(lambdas.iter().any(|&l| l != 0.0));
+    }
+
+    /// Plain LambdaRank: no normalization, no cost weighting, linear gain.
+    fn plain_params() -> LambdaRankParams {
+        LambdaRankParams {
+            sigma: 1.0,
+            query_normalization: false,
+            cost_sensitivity: false,
+            score_normalization: false,
+            exponential_gain: false,
+        }
+    }
+
+    #[test]
+    fn delta_ndcg_uses_ranks_from_current_scores() {
+        // Burges (2010), Section 4.2: |delta NDCG| is the change from swapping
+        // the two documents' positions in the ranking induced by the current
+        // scores. Scores [0, 1, 2] rank doc2, doc1, doc0; only doc0 is
+        // relevant (IDCG = 1), and it sits at rank 2 with discount 1/log2(4).
+        //   (doc0, doc2): |D(0) - D(2)| = 1 - 0.5 = 0.5,          sigmoid term 1/(1+e^-2)
+        //   (doc0, doc1): |D(1) - D(2)| = 1/log2(3) - 0.5,        sigmoid term 1/(1+e^-1)
+        let s = |x: f32| 1.0 / (1.0 + (-x).exp());
+        let l02 = -s(2.0) * 0.5;
+        let l01 = -s(1.0) * (1.0 / 3.0_f32.log2() - 0.5);
+        let expected = [l02 + l01, -l01, -l02];
+
+        let lambdas =
+            compute_lambdarank_gradients(&[0.0, 1.0, 2.0], &[1.0, 0.0, 0.0], plain_params(), None)
+                .unwrap();
+        for (got, want) in lambdas.iter().zip(expected) {
+            assert!(
+                (got - want).abs() < 1e-6,
+                "got {lambdas:?}, want {expected:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn truncation_selects_pairs_by_current_rank() {
+        // With k = 1 only pairs touching the current top document count.
+        // Scores rank doc2 first; doc0 (relevant) and doc1 are both below the
+        // cutoff, so the (doc0, doc1) pair has delta NDCG@1 = 0 and only the
+        // (doc0, doc2) swap, which moves doc0 into the top slot, contributes.
+        let s = |x: f32| 1.0 / (1.0 + (-x).exp());
+        let l02 = -s(2.0);
+        let expected = [l02, 0.0, -l02];
+
+        let lambdas = compute_lambdarank_gradients(
+            &[0.0, 1.0, 2.0],
+            &[1.0, 0.0, 0.0],
+            plain_params(),
+            Some(1),
+        )
+        .unwrap();
+        for (got, want) in lambdas.iter().zip(expected) {
+            assert!(
+                (got - want).abs() < 1e-6,
+                "got {lambdas:?}, want {expected:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn gradients_are_equivariant_to_input_order() {
+        // Listing the same documents in a different order must permute the
+        // gradients the same way; the ranking comes from scores, not input order.
+        let scores = [0.2, 1.5, -0.3, 0.9, 0.4];
+        let relevance = [2.0, 0.0, 3.0, 1.0, 0.0];
+        let perm = [3, 0, 4, 2, 1];
+        let p_scores: Vec<f32> = perm.iter().map(|&i| scores[i]).collect();
+        let p_rel: Vec<f32> = perm.iter().map(|&i| relevance[i]).collect();
+
+        for k in [None, Some(2)] {
+            let params = LambdaRankParams::default();
+            let base = compute_lambdarank_gradients(&scores, &relevance, params, k).unwrap();
+            let permuted = compute_lambdarank_gradients(&p_scores, &p_rel, params, k).unwrap();
+            for (pos, &orig) in perm.iter().enumerate() {
+                assert!(
+                    (permuted[pos] - base[orig]).abs() < 1e-6,
+                    "k={k:?}: base {base:?}, permuted {permuted:?}"
+                );
+            }
+        }
     }
 
     #[test]
