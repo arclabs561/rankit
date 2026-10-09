@@ -7,10 +7,10 @@ Learning-to-rank losses and evaluation.
 
 ## What it does
 
-- **Differentiable ranking**: sigmoid-based soft ranking $\hat{R}_i(\mathbf{s}) = \sum_{j \neq i} \sigma\bigl(\tau(s_j - s_i)\bigr)$. Historical paper-named variants are retained as documented compatibility heuristics. They are $O(n^2)$.
+- **Differentiable ranking**: sigmoid-based soft ranking $\hat{R}_i(\mathbf{s}) = \sum_{j \neq i} \sigma\bigl(\tau(s_i - s_j)\bigr)$, rescaled to $[0, n-1]$ with 0 for the lowest score. Historical paper-named variants are retained as documented compatibility heuristics. They are $O(n^2)$.
 - **Sorting relaxations**: `neural_sort` and `soft_sort` return row-stochastic matrices following the published NeuralSort and SoftSort formulas; expected-rank adapters are also provided.
 - **LTR objectives**: RankNet, an NDCG-weighted pairwise loss, ApproxNDCG, top-one ListNet, and a ListMLE-inspired objective (see formulas below).
-- **Gradient trainers**: LambdaRank and Ranking SVM with configurable query normalization, cost sensitivity, and score normalization.
+- **Gradient trainers**: LambdaRank and Ranking SVM with configurable query normalization, cost sensitivity, and score normalization. LambdaRank's defaults use gain $2^{rel}-1$ and turn on two factors that Burges (2010) does not have (cost sensitivity and query normalization); turn them off for Burges' gradients. The evaluation metrics use linear gain, as `trec_eval` does.
 - **IR evaluation metrics**: NDCG, MAP, MRR, Precision@K, Recall@K, ERR, RBP, F-measure, R-Precision, Success@K. Binary and graded relevance.
 - **TREC format parsing**: load standard TREC run files and qrels, batch evaluate, export CSV/JSON.
 - **Statistical testing**: paired t-test, confidence intervals, Cohen's d effect size.

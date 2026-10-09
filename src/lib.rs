@@ -54,6 +54,11 @@ pub mod sorting;
 /// Ranking heuristics inspired by published methods.
 pub mod methods;
 
+/// Compiles and runs the README's Rust examples as doctests.
+#[cfg(all(doctest, feature = "losses"))]
+#[doc = include_str!("../README.md")]
+pub struct ReadmeDoctests;
+
 /// Analytical gradient computation for soft ranking and Spearman loss.
 pub mod gradients;
 

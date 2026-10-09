@@ -131,7 +131,7 @@ pub fn lambda_loss(predictions: &[f64], relevance: &[f64], k: Option<usize>) -> 
     }
 
     let mut indices: Vec<usize> = (0..n).collect();
-    indices.sort_unstable_by(|&a, &b| predictions[b].partial_cmp(&predictions[a]).unwrap());
+    indices.sort_unstable_by(|&a, &b| predictions[b].total_cmp(&predictions[a]));
 
     let mut rank_of: Vec<usize> = vec![0; n];
     for (rank, &idx) in indices.iter().enumerate() {
@@ -177,7 +177,7 @@ pub fn lambda_loss(predictions: &[f64], relevance: &[f64], k: Option<usize>) -> 
 
 fn compute_idcg(relevance: &[f64], k: usize) -> f64 {
     let mut sorted_rel: Vec<f64> = relevance.to_vec();
-    sorted_rel.sort_unstable_by(|a, b| b.partial_cmp(a).unwrap());
+    sorted_rel.sort_unstable_by(|a, b| b.total_cmp(a));
 
     let mut idcg = 0.0;
     for (rank, &rel) in sorted_rel.iter().enumerate().take(k) {
@@ -340,7 +340,7 @@ pub fn listmle_loss(predictions: &[f64], targets: &[f64], regularization_strengt
     }
 
     let mut target_indices: Vec<usize> = (0..n).collect();
-    target_indices.sort_unstable_by(|&a, &b| targets[b].partial_cmp(&targets[a]).unwrap());
+    target_indices.sort_unstable_by(|&a, &b| targets[b].total_cmp(&targets[a]));
 
     let pred_ranks = crate::rank::soft_rank(predictions, regularization_strength);
 
@@ -361,6 +361,16 @@ pub fn listmle_loss(predictions: &[f64], targets: &[f64], regularization_strengt
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// NaN predictions or targets used to panic in `partial_cmp(..).unwrap()`.
+    #[test]
+    fn losses_tolerate_nan_without_panicking() {
+        let predictions = [0.5, f64::NAN, 0.2, 0.9];
+        let relevance = [1.0, 0.0, f64::NAN, 2.0];
+        let _ = lambda_loss(&predictions, &relevance, None);
+        let _ = lambda_loss(&predictions, &[1.0, 0.0, 0.0, 2.0], Some(2));
+        let _ = listmle_loss(&predictions, &relevance, 1.0);
+    }
 
     #[test]
     fn compatibility_name_matches_index_weighted_heuristic() {
@@ -387,7 +397,7 @@ mod tests {
 
     fn discrete_ndcg_at_k(predictions: &[f64], relevance: &[f64], k: usize) -> f64 {
         let mut indices: Vec<_> = (0..predictions.len()).collect();
-        indices.sort_unstable_by(|&a, &b| predictions[b].partial_cmp(&predictions[a]).unwrap());
+        indices.sort_unstable_by(|&a, &b| predictions[b].total_cmp(&predictions[a]));
 
         let dcg: f64 = indices
             .iter()

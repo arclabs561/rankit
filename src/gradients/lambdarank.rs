@@ -7,6 +7,30 @@
 //! ```text
 //! lambda_ij = -sigma / (1 + exp(sigma * (s_i - s_j))) * |delta_NDCG| * tau * mu
 //! ```
+//!
+//! # Relation to Burges (2010)
+//!
+//! Burges' LambdaRank gradient is the first two factors only:
+//! `-sigma / (1 + exp(sigma * (s_i - s_j))) * |delta_NDCG|`. That is what this
+//! module computes with `cost_sensitivity`, `query_normalization` and
+//! `score_normalization` all set to `false`. The defaults differ:
+//!
+//! - `cost_sensitivity` (default on) multiplies by `tau = 1 / ln(2 + min_rank)`.
+//!   `delta_NDCG` already depends on position, so this weights position twice.
+//! - `query_normalization` (default on) multiplies by `mu = 1 / #pairs` and then
+//!   rescales the list by `log2(1 + S) / S`, with `S` the sum of `|lambda|`
+//!   (the LightGBM normalization).
+//!
+//! Turn these off to get Burges' gradients; leave them on for the scaling this
+//! crate has always used.
+//!
+//! # Gain
+//!
+//! `exponential_gain` (default on) uses gain `2^rel - 1`, the Burges 2010
+//! convention for LambdaRank. `trec_eval` and this crate's `eval` module use
+//! linear gain (`rel`). With the defaults, training optimizes a different nDCG
+//! than evaluation reports; set `exponential_gain: false` to train on the
+//! linear-gain nDCG you evaluate with. The two agree for binary relevance.
 
 use crate::gradients::error::GradientError;
 
@@ -15,13 +39,16 @@ use crate::gradients::error::GradientError;
 pub struct LambdaRankParams {
     /// Sigmoid parameter. Default: 1.0
     pub sigma: f32,
-    /// Enable query normalization (Cao et al. 2006). Default: true
+    /// Enable query normalization: `1 / #pairs` and LightGBM's
+    /// `log2(1 + S) / S` rescaling. Not part of Burges (2010). Default: true
     pub query_normalization: bool,
-    /// Enable cost sensitivity (position-based importance). Default: true
+    /// Enable cost sensitivity: an extra `1 / ln(2 + min_rank)` factor on top of
+    /// `|delta_NDCG|`. Not part of Burges (2010). Default: true
     pub cost_sensitivity: bool,
     /// Enable score normalization (LightGBM-style). Default: false
     pub score_normalization: bool,
-    /// Enable exponential gain for NDCG (2^rel - 1). Default: true
+    /// Enable exponential gain for NDCG (2^rel - 1). Default: true.
+    /// `trec_eval` and `rankit::eval` use linear gain; see the module docs.
     pub exponential_gain: bool,
 }
 
@@ -79,7 +106,7 @@ pub fn ndcg_at_k(
     }
 
     let mut ideal_relevance = relevance.to_vec();
-    ideal_relevance.sort_unstable_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+    ideal_relevance.sort_unstable_by(|a, b| b.total_cmp(a));
 
     let mut idcg = 0.0;
     for i in 0..k {
@@ -147,8 +174,7 @@ fn delta_ndcg(
         idcg
     } else {
         let mut ideal_relevance = relevance.to_vec();
-        ideal_relevance
-            .sort_unstable_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+        ideal_relevance.sort_unstable_by(|a, b| b.total_cmp(a));
         let mut idcg = 0.0;
         for i in 0..k.min(ideal_relevance.len()) {
             let gain = if exponential_gain {
@@ -197,8 +223,7 @@ pub fn compute_lambdarank_gradients(
 
     let inv_idcg = {
         let mut ideal_relevance = relevance.to_vec();
-        ideal_relevance
-            .sort_unstable_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+        ideal_relevance.sort_unstable_by(|a, b| b.total_cmp(a));
         let mut idcg = 0.0;
         for i in 0..k_trunc.min(ideal_relevance.len()) {
             let gain = if params.exponential_gain {
@@ -403,6 +428,68 @@ impl Default for LambdaRankTrainer {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// With every non-Burges factor off, the gradient is Burges (2010):
+    /// lambda = -sigma / (1 + exp(sigma * (s_i - s_j))) * |delta_NDCG|.
+    /// Two documents, equal scores, relevance [1, 0], gain 2^rel - 1:
+    /// |delta_NDCG| = (1 - 0) * (1/log2(2) - 1/log2(3)) / IDCG(=1).
+    #[test]
+    fn burges_lambda_when_extra_factors_disabled() {
+        let params = LambdaRankParams {
+            sigma: 1.0,
+            query_normalization: false,
+            cost_sensitivity: false,
+            score_normalization: false,
+            exponential_gain: true,
+        };
+        let lambdas = compute_lambdarank_gradients(&[0.0, 0.0], &[1.0, 0.0], params, None).unwrap();
+        let delta = 1.0 - 1.0 / 3.0_f32.log2();
+        let expected = -0.5 * delta;
+        assert!((lambdas[0] - expected).abs() < 1e-6, "{lambdas:?}");
+        assert!((lambdas[1] + expected).abs() < 1e-6, "{lambdas:?}");
+    }
+
+    /// The defaults add factors on top of Burges; pin that they change the
+    /// value so the module docs stay true.
+    #[test]
+    fn default_params_scale_burges_lambda() {
+        let lambdas = compute_lambdarank_gradients(
+            &[0.0, 0.0],
+            &[1.0, 0.0],
+            LambdaRankParams::default(),
+            None,
+        )
+        .unwrap();
+        let burges = -0.5 * (1.0 - 1.0 / 3.0_f32.log2());
+        assert!((lambdas[0] - burges).abs() > 1e-3, "{lambdas:?}");
+    }
+
+    /// NaN relevance or scores must not panic the ideal-DCG sort.
+    #[test]
+    fn nan_inputs_do_not_panic() {
+        let mut state = 0x9e37_79b9_7f4a_7c15u64;
+        for _ in 0..50 {
+            let mut next = || {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                if state.is_multiple_of(10) {
+                    f32::NAN
+                } else {
+                    (state % 5) as f32
+                }
+            };
+            let scores: Vec<f32> = (0..64).map(|_| next()).collect();
+            let relevance: Vec<f32> = (0..64).map(|_| next()).collect();
+            let _ = compute_lambdarank_gradients(
+                &scores,
+                &relevance,
+                LambdaRankParams::default(),
+                Some(10),
+            );
+            let _ = ndcg_at_k(&relevance, Some(10), true);
+        }
+    }
 
     #[test]
     fn test_ndcg() {

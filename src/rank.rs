@@ -22,8 +22,10 @@
 /// # Arguments
 ///
 /// * `values` - Input values to rank
-/// * `regularization_strength` - Temperature parameter controlling sharpness
-///   (higher = sharper, more discrete-like behavior)
+/// * `regularization_strength` - Inverse temperature controlling sharpness
+///   (higher = sharper, more discrete-like behavior). This multiplies the
+///   score differences, so it runs opposite to the regularization `ε` of
+///   Blondel et al. 2020 (and `fynch`), where larger `ε` is smoother.
 ///
 /// # Returns
 ///

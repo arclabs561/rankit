@@ -29,7 +29,7 @@ pub fn compute_ndcg(ranked: &[(String, f32)], qrels: &HashMap<String, u32>, k: u
         .filter(|&r| r > 0)
         .map(|r| r as f64)
         .collect();
-    ideal_gains.sort_unstable_by(|a, b| b.partial_cmp(a).unwrap());
+    ideal_gains.sort_unstable_by(|a, b| b.total_cmp(a));
     let ideal_k: Vec<f64> = ideal_gains.into_iter().take(k).collect();
 
     rankops::metrics::ndcg(&relevance, &ideal_k)
