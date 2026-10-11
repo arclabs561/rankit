@@ -45,7 +45,8 @@ pub struct TopKConfig {
     /// Distribution over top-k positions. `p_k[i]` is the weight for top-(i+1).
     /// Must sum to 1.0.
     pub p_k: Vec<f64>,
-    /// Inverse temperature for the soft ranking. Higher = sharper.
+    /// Temperature for the soft ranking: score gaps are divided by it, so
+    /// lower = sharper (closer to hard ranks) and higher = smoother.
     pub temperature: f64,
     /// If set, only the top-m scores are sorted (efficiency for large n_classes).
     /// Must be >= k (length of p_k).
