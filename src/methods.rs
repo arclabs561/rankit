@@ -14,40 +14,7 @@ use crate::rank::sigmoid;
 ///
 /// From: Qin et al. (2008). General differentiable ranking approach.
 pub fn soft_rank_sigmoid(values: &[f64], regularization_strength: f64) -> Vec<f64> {
-    let n = values.len();
-    if n == 0 {
-        return vec![];
-    }
-    if n == 1 {
-        return vec![0.0];
-    }
-
-    let mut ranks = vec![0.0; n];
-
-    for i in 0..n {
-        if !values[i].is_finite() {
-            ranks[i] = f64::NAN;
-            continue;
-        }
-
-        let mut sum = 0.0;
-        let mut valid_comparisons = 0;
-        for j in 0..n {
-            if i != j && values[j].is_finite() {
-                let diff = values[i] - values[j];
-                sum += sigmoid(diff * regularization_strength);
-                valid_comparisons += 1;
-            }
-        }
-
-        if valid_comparisons > 0 {
-            ranks[i] = sum / valid_comparisons as f64 * (n - 1) as f64;
-        } else {
-            ranks[i] = 0.0;
-        }
-    }
-
-    ranks
+    crate::rank::soft_rank(values, regularization_strength)
 }
 
 /// Pairwise logistic soft ranks parameterized by smoothing temperature.
@@ -55,41 +22,7 @@ pub fn soft_rank_sigmoid(values: &[f64], regularization_strength: f64) -> Vec<f6
 /// Lower positive temperatures produce sharper pairwise comparisons. This is
 /// a scalar-rank heuristic; use [`crate::neural_sort`] for NeuralSort.
 pub fn pairwise_logistic_rank(values: &[f64], temperature: f64) -> Vec<f64> {
-    let n = values.len();
-    if n == 0 {
-        return vec![];
-    }
-    if n == 1 {
-        return vec![0.0];
-    }
-
-    let mut ranks = vec![0.0; n];
-
-    for i in 0..n {
-        if !values[i].is_finite() {
-            ranks[i] = f64::NAN;
-            continue;
-        }
-
-        let mut sum = 0.0;
-        let mut valid_comparisons = 0;
-
-        for j in 0..n {
-            if i != j && values[j].is_finite() {
-                let diff = (values[i] - values[j]) / temperature;
-                sum += sigmoid(diff);
-                valid_comparisons += 1;
-            }
-        }
-
-        if valid_comparisons > 0 {
-            ranks[i] = sum / valid_comparisons as f64 * (n - 1) as f64;
-        } else {
-            ranks[i] = 0.0;
-        }
-    }
-
-    ranks
+    crate::rank::pairwise_soft_rank(values, temperature)
 }
 
 /// Compatibility name for [`pairwise_logistic_rank`].

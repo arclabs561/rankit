@@ -75,6 +75,10 @@ name = "neural_surrogate_loss"
 required-features = ["losses"]
 
 [[example]]
+name = "soft_rank_shootout"
+required-features = ["losses"]
+
+[[example]]
 name = "eval_metrics"
 required-features = ["eval"]
 

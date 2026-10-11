@@ -47,6 +47,7 @@ jobs:
         run: |
           cargo run --example soft_dtw_ranking
           cargo run --example soft_rank
+          cargo run --example soft_rank_shootout
           cargo run --example ltr_significance --features eval
           cargo run --example train_with_schedule
 

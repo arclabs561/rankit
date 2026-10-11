@@ -172,7 +172,8 @@ cargo run --release --example pareto_ltr
 
 `soft_dtw_ranking` (Soft-DTW as a ranking sequence loss) and
 `neural_surrogate_loss` (learn a differentiable surrogate for NDCG) round out the
-differentiable-ranking set.
+differentiable-ranking set. `soft_rank_shootout` compares rankit's and fynch's
+soft ranks against a known order and prints LTR losses from both crates.
 
 ## Datasets
 

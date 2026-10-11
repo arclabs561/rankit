@@ -51,9 +51,21 @@
 /// - **Single element**: Returns `[0.0]`
 /// - **NaN/Inf values**: Returns NaN for that element's rank
 /// - **All values identical**: All elements receive rank `(n-1)/2`
+/// - **Infinite strength**: comparisons are hard; tied values each count as
+///   half a win, so ties share their average rank
 pub fn soft_rank(values: &[f64], regularization_strength: f64) -> Vec<f64> {
-    let n = values.len();
+    pairwise_soft_rank(values, 1.0 / regularization_strength)
+}
 
+/// Pairwise logistic soft ranks in rankit's convention: ascending, in
+/// `[0, n-1]`, with `temperature = 1 / regularization_strength`.
+///
+/// The pairwise sum is `fynch::soft_rank` on the finite entries. fynch ranks
+/// descending in `[1, m]`, so `m - fynch_rank` is the number of soft wins. Non-finite
+/// entries get NaN and are left out of the comparisons; the finite ranks are
+/// then rescaled from `[0, m-1]` to `[0, n-1]`.
+pub(crate) fn pairwise_soft_rank(values: &[f64], temperature: f64) -> Vec<f64> {
+    let n = values.len();
     if n == 0 {
         return vec![];
     }
@@ -61,46 +73,55 @@ pub fn soft_rank(values: &[f64], regularization_strength: f64) -> Vec<f64> {
         return vec![0.0];
     }
 
-    let finite_count: usize = values.iter().filter(|&&v| v.is_finite()).count();
+    // A negative temperature reverses every comparison, which equals ranking
+    // the negated values at the positive temperature. fynch rejects zero
+    // (infinite strength); the smallest normal temperature makes every
+    // comparison between non-subnormal gaps hard.
+    let (sign, temperature) = if temperature.is_sign_negative() {
+        (-1.0, -temperature)
+    } else {
+        (1.0, temperature)
+    };
+    let temperature = if temperature == 0.0 {
+        f64::MIN_POSITIVE
+    } else {
+        temperature
+    };
 
-    if finite_count == 0 {
-        return vec![f64::NAN; n];
-    }
-
-    let mut ranks = vec![0.0; n];
-
-    for i in 0..n {
-        if !values[i].is_finite() {
-            ranks[i] = f64::NAN;
-            continue;
-        }
-
-        let mut sum = 0.0;
-        let mut valid_comparisons = 0;
-
-        for j in 0..i {
-            if values[j].is_finite() {
-                let diff = values[i] - values[j];
-                sum += sigmoid(diff * regularization_strength);
-                valid_comparisons += 1;
+    let finite: Vec<f64> = values
+        .iter()
+        .filter(|v| v.is_finite())
+        .map(|&v| sign * v)
+        .collect();
+    let m = finite.len();
+    let finite_ranks: Vec<f64> = match m {
+        0 => return vec![f64::NAN; n],
+        1 => vec![0.0],
+        _ => match fynch::soft_rank(&finite, temperature) {
+            Ok(descending) => {
+                let scale = (n - 1) as f64 / (m - 1) as f64;
+                descending
+                    .into_iter()
+                    .map(|rank| (m as f64 - rank) * scale)
+                    .collect()
             }
-        }
-        for j in (i + 1)..n {
-            if values[j].is_finite() {
-                let diff = values[i] - values[j];
-                sum += sigmoid(diff * regularization_strength);
-                valid_comparisons += 1;
+            // Unreachable: the input is non-empty and the temperature is
+            // positive or NaN, the only cases fynch accepts.
+            Err(_) => vec![f64::NAN; m],
+        },
+    };
+
+    let mut finite_ranks = finite_ranks.into_iter();
+    values
+        .iter()
+        .map(|v| {
+            if v.is_finite() {
+                finite_ranks.next().unwrap_or(f64::NAN)
+            } else {
+                f64::NAN
             }
-        }
-
-        if valid_comparisons > 0 {
-            ranks[i] = (sum / valid_comparisons as f64) * (n - 1) as f64;
-        } else {
-            ranks[i] = 0.0;
-        }
-    }
-
-    ranks
+        })
+        .collect()
 }
 
 /// Numerically stable sigmoid: sigma(x) = 1 / (1 + exp(-x))

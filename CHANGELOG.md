@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `soft_rank`, `soft_rank_sigmoid`, `pairwise_logistic_rank`, and the unsorted
+  path of `soft_rank_optimized` now compute the pairwise sum with
+  `fynch::soft_rank` instead of a local loop. Results match the previous loop
+  to within 1e-10 on finite, tied, and non-finite inputs.
+- With an infinite regularization strength (or zero temperature), tied values
+  now share their average rank instead of returning NaN.
+
 ## [0.1.8] - 2026-10-06
 
 ### Changed

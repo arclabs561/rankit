@@ -30,6 +30,10 @@ pub fn soft_rank_optimized(
     regularization_strength: f64,
     assume_sorted: bool,
 ) -> Vec<f64> {
+    if !assume_sorted {
+        return crate::rank::soft_rank(values, regularization_strength);
+    }
+
     let n = values.len();
 
     if n == 0 {
@@ -41,73 +45,48 @@ pub fn soft_rank_optimized(
 
     let mut ranks = vec![0.0; n];
 
-    if assume_sorted {
-        for i in 0..n {
-            if !values[i].is_finite() {
-                ranks[i] = f64::NAN;
-                continue;
-            }
+    for i in 0..n {
+        if !values[i].is_finite() {
+            ranks[i] = f64::NAN;
+            continue;
+        }
 
-            let mut valid_before = 0;
-            for j in 0..i {
-                if values[j].is_finite() {
-                    valid_before += 1;
-                }
-            }
-
-            let mut sum = valid_before as f64;
-
-            let window = 5usize;
-            let start = i.saturating_sub(window);
-            let end = (i + window + 1).min(n);
-
-            for j in start..end {
-                if i != j && values[j].is_finite() {
-                    let diff = values[i] - values[j];
-                    let sig = sigmoid(diff * regularization_strength);
-                    if j < i {
-                        sum += sig - 1.0;
-                    } else {
-                        sum += sig;
-                    }
-                }
-            }
-
-            let mut valid_comparisons = 0;
-            for j in 0..n {
-                if i != j && values[j].is_finite() {
-                    valid_comparisons += 1;
-                }
-            }
-
-            if valid_comparisons > 0 {
-                ranks[i] = sum / valid_comparisons as f64 * (n - 1) as f64;
-            } else {
-                ranks[i] = 0.0;
+        let mut valid_before = 0;
+        for j in 0..i {
+            if values[j].is_finite() {
+                valid_before += 1;
             }
         }
-    } else {
-        for i in 0..n {
-            if !values[i].is_finite() {
-                ranks[i] = f64::NAN;
-                continue;
-            }
 
-            let mut sum = 0.0;
-            let mut valid_comparisons = 0;
-            for j in 0..n {
-                if i != j && values[j].is_finite() {
-                    let diff = values[i] - values[j];
-                    sum += sigmoid(diff * regularization_strength);
-                    valid_comparisons += 1;
+        let mut sum = valid_before as f64;
+
+        let window = 5usize;
+        let start = i.saturating_sub(window);
+        let end = (i + window + 1).min(n);
+
+        for j in start..end {
+            if i != j && values[j].is_finite() {
+                let diff = values[i] - values[j];
+                let sig = sigmoid(diff * regularization_strength);
+                if j < i {
+                    sum += sig - 1.0;
+                } else {
+                    sum += sig;
                 }
             }
+        }
 
-            if valid_comparisons > 0 {
-                ranks[i] = sum / valid_comparisons as f64 * (n - 1) as f64;
-            } else {
-                ranks[i] = 0.0;
+        let mut valid_comparisons = 0;
+        for j in 0..n {
+            if i != j && values[j].is_finite() {
+                valid_comparisons += 1;
             }
+        }
+
+        if valid_comparisons > 0 {
+            ranks[i] = sum / valid_comparisons as f64 * (n - 1) as f64;
+        } else {
+            ranks[i] = 0.0;
         }
     }
 
