@@ -82,6 +82,7 @@ requirements, and real sample output.
 ## References
 
 - Burges et al. "Learning to Rank using Gradient Descent" (ICML 2005): RankNet
+- Burges. ["From RankNet to LambdaRank to LambdaMART: An Overview"](https://www.microsoft.com/en-us/research/publication/from-ranknet-to-lambdarank-to-lambdamart-an-overview/) (Microsoft Research, MSR-TR-2010-82, 2010): LambdaRank
 - Qin & Liu. "A General Approximation Framework for Direct Optimization of Information Retrieval Measures" (2010): ApproxNDCG
 - Cao et al. "Learning to Rank: From Pairwise Approach to Listwise Approach" (ICML 2007): ListNet
 - Xia et al. "Listwise Approach to Learning to Rank" (ICML 2008): ListMLE
