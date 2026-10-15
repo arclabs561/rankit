@@ -5,6 +5,13 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Source history (unversioned)
+
+These entries identify source changes without assigning a package release.
+
+- Add the LambdaRank overview to the bibliography. This is a documentation-only change.
+  ([86a55cc](https://github.com/arclabs561/rankit/commit/86a55cc2aaf857e96c93598cf88ff4043dabd9b7))
+
 ## [Unreleased]
 
 ### Changed
