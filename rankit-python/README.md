@@ -41,8 +41,8 @@ score = ranklab.ndcg(ranked, qrels, k=3)
 | `soft_rank_smooth_i` | Compatibility name for `soft_rank_sigmoid`; not SmoothI |
 | `differentiable_topk` | Pairwise soft-rank thresholding, returns (values, indicators) |
 | `ranknet_loss` | RankNet pairwise cross-entropy loss |
-| `approx_ndcg` | Differentiable NDCG approximation via softmax |
-| `lambda_loss` | LambdaLoss ranking loss |
+| `approx_ndcg` | NDCG approximation using pairwise sigmoid soft ranks |
+| `lambda_loss` | NDCG-weighted pairwise ranking loss |
 | `listnet_loss` | ListNet cross-entropy over top-one probabilities |
 | `listmle_loss` | ListMLE-inspired likelihood over sigmoid soft ranks |
 | `compute_lambdarank_gradients` | Per-document LambdaRank gradients |

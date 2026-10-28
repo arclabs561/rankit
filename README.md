@@ -32,13 +32,18 @@ Neither build enables the optional `innr` backend in `rankops`.
 
 ## Quick start
 
+```toml
+[dependencies]
+rankit = "0.1.8"
+```
+
 ```rust
 use rankit::{soft_rank, ranknet_loss};
 
 // Differentiable ranking
 let scores = vec![5.0, 1.0, 2.0, 4.0, 3.0];
 let ranks = soft_rank(&scores, 1.0);
-// ranks[0] ≈ 4.0 (highest), ranks[1] ≈ 0.0 (lowest)
+// ranks[0] ≈ 3.546 (highest), ranks[1] ≈ 0.454 (lowest)
 
 // RankNet pairwise loss
 let predictions = vec![0.8, 0.3, 0.6];

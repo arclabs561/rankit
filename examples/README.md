@@ -8,7 +8,7 @@ All outputs below are real, captured from a run.
 
 ## Metrics and evaluation
 
-### `eval_metrics` — which IR metrics does rankit compute?
+### `eval_metrics`: which IR metrics does rankit compute?
 
 Precision/recall at k, MRR, MAP, and NDCG over a ranked list with known
 relevance, for both binary and graded judgments.
@@ -31,7 +31,7 @@ Relevant: {"doc_5", "doc_1", "doc_8", "doc_3"}
   NDCG@5 = 0.586
 ```
 
-### `ltr_significance` — is my ranker significantly better, or just luckier?
+### `ltr_significance`: is my ranker significantly better, or just luckier?
 
 Pairs rankit's NDCG with [statskit](https://crates.io/crates/statskit): a
 Wilcoxon signed-rank test plus a bootstrap confidence interval on the per-query
@@ -51,7 +51,7 @@ LTR significance: rankit NDCG@10 + statskit
 
 ## Differentiable ranking
 
-### `soft_rank` — how do you turn a hard ranking into a differentiable one?
+### `soft_rank`: how do you turn a hard ranking into a differentiable one?
 
 Soft ranks at increasing sharpness `alpha` (recovering the hard permutation in
 the limit), and a comparison of the pairwise sigmoid compatibility heuristics.
@@ -72,7 +72,7 @@ Method comparison (alpha=5):
   Sigmoid alias [3.993, 0.007, 1.000, 3.000, 2.000]
 ```
 
-### `lambdarank` — which documents does LambdaRank push up or down?
+### `lambdarank`: which documents does LambdaRank push up or down?
 
 The per-document LambdaRank gradient `dC/ds_i`: its sign and magnitude say which
 way and how hard each document should move to raise NDCG.
@@ -93,7 +93,7 @@ LambdaRank gradients (default params):
 
 ## Training
 
-### `train_with_schedule` — how do I train a ranker end to end?
+### `train_with_schedule`: how do I train a ranker end to end?
 
 A RankNet training loop driven by [descend](https://crates.io/crates/descend)'s
 warmup-cosine LR schedule with EMA weight averaging.
@@ -108,7 +108,7 @@ schedule LR: warmup-start=0.0000, peak=0.5000, end=0.0000
   [PASS] loss decreased and the warmup-cosine schedule shaped the LR
 ```
 
-### `ltr_lightgbm_train_eval` — does training actually help on a real LETOR dataset?
+### `ltr_lightgbm_train_eval`: does training actually help on a real LETOR dataset?
 
 Linear learning-to-rank with LambdaRank gradients on the LightGBM ranking
 dataset (300 features), reporting NDCG@10 and MAP before vs after training.
@@ -133,7 +133,7 @@ improvement              NDCG@10 +0.1807   MAP +0.1071
 
 ## Pipeline and multi-objective
 
-### `retrieval_pipeline` — what does a full retrieve-and-rank pipeline look like?
+### `retrieval_pipeline`: what does a full retrieve-and-rank pipeline look like?
 
 Tokenize, BM25-index, score, rank, and evaluate over a small document set.
 Needs the `pipeline` and `eval` features.
@@ -150,7 +150,7 @@ cargo run --release --features "pipeline eval" --example retrieval_pipeline
     #3 doc=4  score=   1.215  Information retrieval systems combine indexing with relev...
 ```
 
-### `pareto_ltr` — how do I trade off NDCG against diversity and fairness?
+### `pareto_ltr`: how do I trade off NDCG against diversity and fairness?
 
 Sweeps ranking configs and marks the Pareto frontier across three competing
 objectives, so the trade-off surface is explicit instead of collapsed to one
