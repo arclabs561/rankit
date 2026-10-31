@@ -16,7 +16,6 @@
 //! ```
 
 use postings::{DocId, PostingsIndex};
-use std::collections::HashMap;
 
 /// Relevance scoring method.
 #[derive(Debug, Clone)]
@@ -63,7 +62,7 @@ pub struct SearchResult {
 pub struct Pipeline {
     index: PostingsIndex<String>,
     scoring: Scoring,
-    corpus_tf: HashMap<String, u64>,
+    /// Token count over live documents (the LM collection size).
     total_corpus_tokens: u64,
 }
 
@@ -73,7 +72,6 @@ impl Pipeline {
         Self {
             index: PostingsIndex::new(),
             scoring,
-            corpus_tf: HashMap::new(),
             total_corpus_tokens: 0,
         }
     }
@@ -96,16 +94,19 @@ impl Pipeline {
     /// Returns `Err` if `doc_id` already exists.
     pub fn add(&mut self, doc_id: DocId, text: &str) -> Result<(), postings::Error> {
         let tokens = Self::tokenize(text);
-        for t in &tokens {
-            *self.corpus_tf.entry(t.clone()).or_insert(0) += 1;
-            self.total_corpus_tokens += 1;
-        }
-        self.index.add_document(doc_id, &tokens)
+        self.index.add_document(doc_id, &tokens)?;
+        self.total_corpus_tokens += tokens.len() as u64;
+        Ok(())
     }
 
     /// Remove a document. Returns `true` if it existed.
     pub fn remove(&mut self, doc_id: DocId) -> bool {
-        self.index.delete_document(doc_id)
+        let len = u64::from(self.index.document_len(doc_id));
+        let existed = self.index.delete_document(doc_id);
+        if existed {
+            self.total_corpus_tokens -= len;
+        }
+        existed
     }
 
     /// Number of indexed documents.
@@ -150,10 +151,17 @@ impl Pipeline {
     ) -> Vec<SearchResult> {
         let n = self.index.num_docs();
         let avg_dl = self.index.avg_doc_len();
+        // Collection probabilities for the LM scorers, once per query term.
+        let p_c: Vec<f32> = match self.scoring {
+            Scoring::DirichletLm { .. } | Scoring::JelinekMercerLm { .. } => {
+                query_tokens.iter().map(|t| self.corpus_prob(t)).collect()
+            }
+            _ => Vec::new(),
+        };
 
         let mut scored: Vec<(DocId, f32)> = candidates
             .iter()
-            .map(|&id| (id, self.score_doc(id, query_tokens, n, avg_dl)))
+            .map(|&id| (id, self.score_doc(id, query_tokens, &p_c, n, avg_dl)))
             .collect();
 
         scored.sort_by(|a, b| b.1.total_cmp(&a.1));
@@ -170,7 +178,14 @@ impl Pipeline {
             .collect()
     }
 
-    fn score_doc(&self, doc_id: DocId, query: &[String], n_docs: u32, avg_dl: f32) -> f32 {
+    fn score_doc(
+        &self,
+        doc_id: DocId,
+        query: &[String],
+        p_c: &[f32],
+        n_docs: u32,
+        avg_dl: f32,
+    ) -> f32 {
         let dl = self.index.document_len(doc_id) as f32;
 
         match &self.scoring {
@@ -198,10 +213,10 @@ impl Pipeline {
                 }
                 s
             }
-            Scoring::DirichletLm { mu } => self.lm_score(doc_id, query, |tf, p_c| {
+            Scoring::DirichletLm { mu } => self.lm_score(doc_id, query, p_c, |tf, p_c| {
                 rankfns::lm_smoothed_p(tf, dl, p_c, rankfns::SmoothingMethod::Dirichlet { mu: *mu })
             }),
-            Scoring::JelinekMercerLm { lambda } => self.lm_score(doc_id, query, |tf, p_c| {
+            Scoring::JelinekMercerLm { lambda } => self.lm_score(doc_id, query, p_c, |tf, p_c| {
                 rankfns::lm_smoothed_p(
                     tf,
                     dl,
@@ -212,11 +227,16 @@ impl Pipeline {
         }
     }
 
-    fn lm_score(&self, doc_id: DocId, query: &[String], smooth: impl Fn(f32, f32) -> f32) -> f32 {
+    fn lm_score(
+        &self,
+        doc_id: DocId,
+        query: &[String],
+        p_c: &[f32],
+        smooth: impl Fn(f32, f32) -> f32,
+    ) -> f32 {
         let mut log_s = 0.0f32;
-        for t in query {
+        for (t, &p_c) in query.iter().zip(p_c) {
             let tf = self.index.term_frequency(doc_id, t.as_str()) as f32;
-            let p_c = self.corpus_prob(t);
             let p = smooth(tf, p_c);
             if p > 0.0 {
                 log_s += p.ln();
@@ -229,7 +249,14 @@ impl Pipeline {
         if self.total_corpus_tokens == 0 {
             return 0.0;
         }
-        self.corpus_tf.get(term).copied().unwrap_or(0) as f32 / self.total_corpus_tokens as f32
+        // Read from the live postings so rejected adds and removals cannot
+        // leave stale collection counts.
+        let tf: u64 = self
+            .index
+            .postings_iter(term)
+            .map(|(_, w)| u64::from(w))
+            .sum();
+        tf as f32 / self.total_corpus_tokens as f32
     }
 }
 
@@ -276,6 +303,40 @@ mod tests {
         let results = p.search("beta", 10);
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].doc_id, 1);
+    }
+
+    fn lm_scores(p: &Pipeline, q: &str) -> Vec<(DocId, f32)> {
+        let mut v: Vec<_> = p
+            .search(q, 10)
+            .into_iter()
+            .map(|r| (r.doc_id, r.score))
+            .collect();
+        v.sort_by_key(|x| x.0);
+        v
+    }
+
+    #[test]
+    fn rejected_duplicate_add_leaves_lm_scores_unchanged() {
+        let mut p = Pipeline::new(Scoring::DirichletLm { mu: 10.0 });
+        p.add(0, "apple banana").unwrap();
+        p.add(1, "cherry date").unwrap();
+        let before = lm_scores(&p, "apple");
+        assert!(p.add(0, "apple apple apple apple").is_err());
+        assert_eq!(lm_scores(&p, "apple"), before);
+    }
+
+    #[test]
+    fn remove_matches_never_added_for_lm_scores() {
+        let mut a = Pipeline::new(Scoring::DirichletLm { mu: 10.0 });
+        a.add(0, "apple banana").unwrap();
+        a.add(1, "cherry date").unwrap();
+        a.add(2, "apple apple apple apple apple apple").unwrap();
+        assert!(a.remove(2));
+        assert!(!a.remove(2));
+        let mut b = Pipeline::new(Scoring::DirichletLm { mu: 10.0 });
+        b.add(0, "apple banana").unwrap();
+        b.add(1, "cherry date").unwrap();
+        assert_eq!(lm_scores(&a, "apple"), lm_scores(&b, "apple"));
     }
 
     #[test]
