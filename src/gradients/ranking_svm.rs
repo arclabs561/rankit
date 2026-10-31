@@ -39,6 +39,10 @@ pub fn pairwise_hinge_loss(score_i: f32, score_j: f32, _params: RankingSVMParams
 
 /// Compute Ranking SVM gradients for a ranked list.
 ///
+/// With `cost_sensitivity`, each pair is weighted by `tau = 1 / ln(2 + min_rank)`,
+/// where ranks come from the current scores (descending, ties by input order),
+/// so the result does not depend on the order documents are passed in.
+///
 /// # Errors
 ///
 /// Returns `GradientError::EmptyInput` if inputs are empty.
@@ -61,6 +65,15 @@ pub fn compute_ranking_svm_gradients(
 
     let n = scores.len();
     let mut gradients = vec![0.0; n];
+
+    // Rank of each document under the current scores (descending, ties by
+    // input order), as in LambdaRank.
+    let mut order: Vec<usize> = (0..n).collect();
+    order.sort_by(|&a, &b| scores[b].total_cmp(&scores[a]));
+    let mut rank = vec![0usize; n];
+    for (r, &doc) in order.iter().enumerate() {
+        rank[doc] = r;
+    }
 
     let mut valid_pairs = 0;
     for i in 0..n {
@@ -90,7 +103,7 @@ pub fn compute_ranking_svm_gradients(
 
             if score_diff < 1.0 {
                 let tau = if params.cost_sensitivity {
-                    let min_rank = high_idx.min(low_idx);
+                    let min_rank = rank[high_idx].min(rank[low_idx]);
                     1.0 / ((min_rank + 2) as f32).ln()
                 } else {
                     1.0
@@ -234,6 +247,48 @@ mod tests {
             ranking_hinge_objective(&updated, &relevance, params.c)
                 < ranking_hinge_objective(&scores, &relevance, params.c)
         );
+    }
+
+    #[test]
+    fn cost_sensitive_gradients_are_permutation_equivariant() {
+        // Ranks for tau come from the scores, so permuting the inputs must
+        // permute the gradients the same way.
+        let scores = [0.1, 0.9, 0.4, 0.6];
+        let relevance = [2.0, 0.0, 1.0, 3.0];
+        let params = RankingSVMParams::default();
+        let base = compute_ranking_svm_gradients(&scores, &relevance, params).unwrap();
+
+        let perm = [2, 0, 3, 1];
+        let p_scores: Vec<f32> = perm.iter().map(|&i| scores[i]).collect();
+        let p_relevance: Vec<f32> = perm.iter().map(|&i| relevance[i]).collect();
+        let permuted = compute_ranking_svm_gradients(&p_scores, &p_relevance, params).unwrap();
+
+        for (pos, &i) in perm.iter().enumerate() {
+            assert!(
+                (permuted[pos] - base[i]).abs() < 1e-6,
+                "doc {i}: permuted {} vs base {}",
+                permuted[pos],
+                base[i]
+            );
+        }
+    }
+
+    #[test]
+    fn cost_sensitive_tau_uses_score_rank() {
+        // Scores rank doc2, doc1, doc0. Input positions would give the
+        // violated pair (doc0, doc1) min_rank 0; score ranks give 1.
+        let params = RankingSVMParams {
+            c: 1.0,
+            query_normalization: false,
+            cost_sensitivity: true,
+            epsilon: 1e-10,
+        };
+        let g = compute_ranking_svm_gradients(&[0.0, 0.5, 2.0], &[1.0, 0.0, 1.0], params).unwrap();
+        // (doc2 high, doc1 low) is satisfied (margin 1.5) and contributes 0.
+        let tau = 1.0 / 3.0_f32.ln();
+        assert!((g[0] + tau).abs() < 1e-6, "{g:?}");
+        assert!((g[1] - tau).abs() < 1e-6, "{g:?}");
+        assert_eq!(g[2], 0.0);
     }
 
     #[test]
