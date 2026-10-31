@@ -23,6 +23,14 @@ These entries identify source changes without assigning a package release.
 - With an infinite regularization strength (or zero temperature), tied values
   now share their average rank instead of returning NaN.
 
+### Fixed
+
+- `pipeline::Pipeline` language-model scores now reflect only live documents.
+  `add` counted a document's tokens into the collection statistics before a
+  duplicate id was rejected, and `remove` never subtracted them, so a failed
+  add or a removal changed every later Dirichlet or Jelinek-Mercer score.
+  Collection term counts are now read from the postings index.
+
 ## [0.1.8] - 2026-10-06
 
 ### Changed
