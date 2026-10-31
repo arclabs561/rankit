@@ -34,7 +34,8 @@ pub enum Scoring {
         /// Prior strength (typical: 1000--2000).
         mu: f32,
     },
-    /// Jelinek-Mercer smoothed query likelihood language model.
+    /// Jelinek-Mercer smoothed query likelihood language model:
+    /// `p(t|d) = (1 - lambda) * tf / |d| + lambda * p(t|C)`.
     JelinekMercerLm {
         /// Interpolation weight for collection model in \[0, 1\].
         lambda: f32,
@@ -221,7 +222,11 @@ impl Pipeline {
                     tf,
                     dl,
                     p_c,
-                    rankfns::SmoothingMethod::JelinekMercer { lambda: *lambda },
+                    // rankfns' lambda weights the document model; ours weights
+                    // the collection model.
+                    rankfns::SmoothingMethod::JelinekMercer {
+                        lambda: 1.0 - *lambda,
+                    },
                 )
             }),
         }
@@ -337,6 +342,22 @@ mod tests {
         b.add(0, "apple banana").unwrap();
         b.add(1, "cherry date").unwrap();
         assert_eq!(lm_scores(&a, "apple"), lm_scores(&b, "apple"));
+    }
+
+    #[test]
+    fn jelinek_mercer_lambda_weights_collection_model() {
+        let mut p = Pipeline::new(Scoring::JelinekMercerLm { lambda: 0.2 });
+        p.add(0, "apple banana").unwrap();
+        p.add(1, "cherry date").unwrap();
+        // p(apple|d0) = 0.8 * (1/2) + 0.2 * (1/4) = 0.45.
+        let expected = 0.45f32.ln();
+        let scores = lm_scores(&p, "apple");
+        assert_eq!(scores.len(), 1);
+        assert!(
+            (scores[0].1 - expected).abs() < 1e-6,
+            "score {} vs expected {expected}",
+            scores[0].1
+        );
     }
 
     #[test]

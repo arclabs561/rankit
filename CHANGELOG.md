@@ -16,6 +16,13 @@ These entries identify source changes without assigning a package release.
 
 ### Changed
 
+- Behaviour change: `pipeline::Scoring::JelinekMercerLm { lambda }` now uses
+  `lambda` as the collection-model weight, as documented (Zhai and Lafferty
+  2001): `p(t|d) = (1 - lambda) * tf / |d| + lambda * p(t|C)`. It was passed
+  to `rankfns::lm_smoothed_p` as the document-model weight, so the code
+  computed the mirror image of the doc. Scores change for any `lambda` other
+  than 0.5; a tuned `lambda` should be replaced by `1 - lambda` to keep
+  previous scores.
 - `soft_rank`, `soft_rank_sigmoid`, `pairwise_logistic_rank`, and the unsorted
   path of `soft_rank_optimized` now compute the pairwise sum with
   `fynch::soft_rank` instead of a local loop. Results match the previous loop
@@ -25,6 +32,11 @@ These entries identify source changes without assigning a package release.
 
 ### Fixed
 
+- Behaviour change: `compute_ranking_svm_gradients` with `cost_sensitivity`
+  now takes the rank in `tau = 1 / ln(rank + 2)` from the current scores
+  (descending, ties by input order), as `compute_lambdarank_gradients` does.
+  It used input positions, so permuting the documents changed their
+  gradients. Gradients change whenever input order differs from score order.
 - `pipeline::Pipeline` language-model scores now reflect only live documents.
   `add` counted a document's tokens into the collection statistics before a
   duplicate id was rejected, and `remove` never subtracted them, so a failed
