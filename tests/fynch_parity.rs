@@ -147,7 +147,62 @@ const DELEGATION_CASES: &[&[f64]] = &[
     &[f64::NAN, f64::NAN],
     &[f64::NAN],
     &[],
+    // Length 10, distinct and ascending.
+    &[-5.0, -4.0, -3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0, 4.0],
+    // Length 10 with ties, negatives and a repeated maximum.
+    &[
+        100.0, -100.0, 100.0, 0.0, 0.0, 50.0, -50.0, 25.0, -25.0, 12.5,
+    ],
 ];
+
+/// The vectors the fynch delegation was verified against: ties, a constant
+/// vector, negatives, length 1 and length 10.
+const AGREEMENT_CASES: &[&[f64]] = &[
+    &[3.0],
+    &[3.0, 1.0],
+    &[5.0, 1.0, 2.0, 4.0, 3.0],
+    &[2.0, 2.0, 2.0, 2.0, 2.0],
+    &[-3.0, 0.0, 7.5, 2.25],
+    &[0.3, -1.2, 0.3, 4.0, -1.2, 0.0],
+    &[-5.0, -4.0, -3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0, 4.0],
+    &[9.5, -9.5, 0.0, 1.0, 1.0, -1.0, 2.0, -2.0],
+    &[
+        100.0, -100.0, 100.0, 0.0, 0.0, 50.0, -50.0, 25.0, -25.0, 12.5,
+    ],
+];
+
+/// `soft_rank` delegates its pairwise sum to `fynch::soft_rank`, so the two
+/// differ only by the descending-[1, m] to ascending-[0, n-1] conversion.
+/// Measured max |delta| over this matrix: 0.0, asserted at the 1e-10 the
+/// delegation was accepted at.
+#[test]
+fn soft_rank_agrees_with_fynch_at_1e10_precision() {
+    assert!(AGREEMENT_CASES.iter().any(|case| case.len() == 1));
+    assert!(AGREEMENT_CASES.iter().any(|case| case.len() == 10));
+    assert!(
+        AGREEMENT_CASES
+            .iter()
+            .any(|case| case.len() > 1 && case.iter().all(|value| *value == case[0])),
+        "a constant vector must stay in the matrix"
+    );
+
+    let mut max_difference = 0.0_f64;
+    for values in AGREEMENT_CASES {
+        for temperature in [0.05, 0.2, 0.5, 1.0, 2.5] {
+            let from_fynch = fynch::soft_rank(values, temperature).unwrap();
+            let from_rankit = rankit::soft_rank(values, 1.0 / temperature);
+            let n = values.len() as f64;
+            for (fynch_rank, rankit_rank) in from_fynch.iter().zip(&from_rankit) {
+                max_difference = max_difference.max((n - fynch_rank - rankit_rank).abs());
+            }
+        }
+    }
+
+    assert!(
+        max_difference < 1e-10,
+        "values={AGREEMENT_CASES:?}, max |difference| = {max_difference:e}"
+    );
+}
 
 #[test]
 fn soft_rank_matches_pre_delegation_loop() {
