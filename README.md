@@ -7,7 +7,7 @@ Learning-to-rank losses and evaluation.
 
 ## What it does
 
-- **Differentiable ranking**: sigmoid-based soft ranking $\hat{R}_i(\mathbf{s}) = \sum_{j \neq i} \sigma\bigl(\tau(s_i - s_j)\bigr)$, rescaled to $[0, n-1]$ with 0 for the lowest score. Historical paper-named variants are retained as documented compatibility heuristics. They are $O(n^2)$.
+- **Differentiable ranking**: sigmoid-based soft ranking $\hat{R}_i(\mathbf{s}) = \sum_{j \neq i} \sigma\bigl(\tau(s_i - s_j)\bigr)$, in $[0, n-1]$ with 0 for the lowest score. The paper-named functions in `methods` are pairwise heuristics, not the published operators. All are $O(n^2)$.
 - **Sorting relaxations**: `neural_sort` and `soft_sort` return row-stochastic matrices following the published NeuralSort and SoftSort formulas; expected-rank adapters are also provided.
 - **LTR objectives**: RankNet, an NDCG-weighted pairwise loss, ApproxNDCG, top-one ListNet, and a ListMLE-inspired objective (see formulas below).
 - **Gradient trainers**: LambdaRank and Ranking SVM with configurable query normalization, cost sensitivity, and score normalization. LambdaRank's defaults use gain $2^{rel}-1$ and turn on two factors that Burges (2010) does not have (cost sensitivity and query normalization); turn them off for Burges' gradients. The evaluation metrics use linear gain, as `trec_eval` does.
@@ -77,6 +77,17 @@ requirements, and real sample output.
 | `ltr_lightgbm_train_eval` | LambdaRank on the LightGBM ranking dataset |
 | `retrieval_pipeline` | BM25 retrieval with the `pipeline` and `eval` features |
 
+`cargo run --release --example soft_rank` prints how the strength parameter
+sharpens soft ranks toward hard ranks:
+
+```text
+Scores: [5.0, 1.0, 2.0, 4.0, 3.0]
+
+alpha=  0.1  ranks=[2.248, 1.752, 1.876, 2.124, 2.000]
+alpha=  1.0  ranks=[3.546, 0.454, 1.167, 2.833, 2.000]
+alpha= 10.0  ranks=[4.000, 0.000, 1.000, 3.000, 2.000]
+```
+
 ## Crate topology
 
 `rankit` builds on [`fynch`](https://crates.io/crates/fynch) (Fenchel-Young losses, differentiable sorting primitives). Related crates:
@@ -88,7 +99,7 @@ requirements, and real sample output.
 
 - Burges et al. "Learning to Rank using Gradient Descent" (ICML 2005): RankNet
 - Burges. ["From RankNet to LambdaRank to LambdaMART: An Overview"](https://www.microsoft.com/en-us/research/publication/from-ranknet-to-lambdarank-to-lambdamart-an-overview/) (Microsoft Research, MSR-TR-2010-82, 2010): LambdaRank
-- Qin & Liu. "A General Approximation Framework for Direct Optimization of Information Retrieval Measures" (2010): ApproxNDCG
+- Qin et al. "A General Approximation Framework for Direct Optimization of Information Retrieval Measures" (Information Retrieval, 2010): ApproxNDCG
 - Cao et al. "Learning to Rank: From Pairwise Approach to Listwise Approach" (ICML 2007): ListNet
 - Xia et al. "Listwise Approach to Learning to Rank" (ICML 2008): ListMLE
 - Blondel et al. "Fast Differentiable Sorting and Ranking" (ICML 2020): soft ranking methods
