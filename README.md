@@ -34,7 +34,7 @@ Neither build enables the optional `innr` backend in `rankops`.
 
 ```toml
 [dependencies]
-rankit = "0.1.8"
+rankit = "0.2.0"
 ```
 
 ```rust

@@ -14,6 +14,8 @@ These entries identify source changes without assigning a package release.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-02
+
 ### Changed
 
 - Behaviour change: `pipeline::Scoring::JelinekMercerLm { lambda }` now uses
