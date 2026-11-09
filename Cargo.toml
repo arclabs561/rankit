@@ -36,7 +36,7 @@ pipeline = ["dep:textprep", "dep:postings", "dep:rankfns"]
 
 [dependencies]
 fynch = "0.3.2"
-rankops = { version = "0.2", default-features = false }
+rankops = { version = "0.5", default-features = false }
 thiserror = "2.0"
 
 # Optional
