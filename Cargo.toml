@@ -35,7 +35,7 @@ serde = ["dep:serde", "dep:serde_json"]
 pipeline = ["dep:textprep", "dep:postings", "dep:rankfns"]
 
 [dependencies]
-fynch = "0.3.2"
+fynch = "0.5.0"
 rankops = { version = "0.2", default-features = false }
 thiserror = "2.0"
 
