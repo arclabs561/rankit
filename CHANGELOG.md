@@ -14,6 +14,13 @@ These entries identify source changes without assigning a package release.
 
 ## [Unreleased]
 
+### Fixed
+
+- Query-likelihood search assigns a log score of negative infinity when a
+  document has zero probability for an indexed query term. Previously an
+  incomplete match could outrank a complete match with smoothing disabled.
+  Jelinek–Mercer scoring also preserves small positive collection weights.
+
 ## [0.2.0] - 2026-11-02
 
 ### Changed

@@ -53,7 +53,8 @@ impl Default for Scoring {
 pub struct SearchResult {
     /// Document identifier.
     pub doc_id: DocId,
-    /// Relevance score. Higher is better for BM25/TF-IDF; less negative for LM.
+    /// Relevance score. Language models return log likelihood over query terms
+    /// present in the collection. An impossible match has score `-∞`.
     pub score: f32,
     /// 1-based rank in result list.
     pub rank: usize,
@@ -218,15 +219,14 @@ impl Pipeline {
                 rankfns::lm_smoothed_p(tf, dl, p_c, rankfns::SmoothingMethod::Dirichlet { mu: *mu })
             }),
             Scoring::JelinekMercerLm { lambda } => self.lm_score(doc_id, query, p_c, |tf, p_c| {
+                // rankfns weights the first model. Give it p(t|C) as a
+                // probability over unit mass, so even a tiny collection weight
+                // reaches the scorer without rounding 1 - lambda to one.
                 rankfns::lm_smoothed_p(
-                    tf,
-                    dl,
                     p_c,
-                    // rankfns' lambda weights the document model; ours weights
-                    // the collection model.
-                    rankfns::SmoothingMethod::JelinekMercer {
-                        lambda: 1.0 - *lambda,
-                    },
+                    1.0,
+                    tf / dl,
+                    rankfns::SmoothingMethod::JelinekMercer { lambda: *lambda },
                 )
             }),
         }
@@ -241,11 +241,12 @@ impl Pipeline {
     ) -> f32 {
         let mut log_s = 0.0f32;
         for (t, &p_c) in query.iter().zip(p_c) {
+            if p_c == 0.0 {
+                continue;
+            }
             let tf = self.index.term_frequency(doc_id, t.as_str()) as f32;
             let p = smooth(tf, p_c);
-            if p > 0.0 {
-                log_s += p.ln();
-            }
+            log_s += p.ln();
         }
         log_s
     }
