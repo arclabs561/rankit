@@ -17,7 +17,7 @@ doc = false
 
 [dependencies]
 rankit = { path = "..", features = ["eval", "losses"] }
-pyo3 = "0.29.0"
+pyo3 = "0.30.1"
 numpy = "0.29.0"
 
 [workspace]
