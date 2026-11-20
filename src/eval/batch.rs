@@ -198,12 +198,19 @@ pub fn evaluate_trec_system(
             .map(|(id, _)| id)
             .collect();
 
+        // nDCG uses the grades themselves; the other metrics are binary by
+        // definition and use `relevant` (grade > 0).
+        let ranked_scored: Vec<(String, f32)> = query_runs
+            .iter()
+            .map(|run| (run.doc_id.clone(), run.score))
+            .collect();
+
         let mut query_metrics = HashMap::new();
 
         for metric_name in metrics {
             let value = match *metric_name {
-                "ndcg@10" => ndcg_at_k(&ranked_ids, &relevant, 10),
-                "ndcg@5" => ndcg_at_k(&ranked_ids, &relevant, 5),
+                "ndcg@10" => crate::eval::graded::compute_ndcg(&ranked_scored, query_qrels, 10),
+                "ndcg@5" => crate::eval::graded::compute_ndcg(&ranked_scored, query_qrels, 5),
                 "precision@10" => precision_at_k(&ranked_ids, &relevant, 10),
                 "precision@5" => precision_at_k(&ranked_ids, &relevant, 5),
                 "precision@1" => precision_at_k(&ranked_ids, &relevant, 1),
@@ -345,6 +352,30 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["q1", "q2"]
         );
+    }
+
+    #[test]
+    fn ndcg_uses_relevance_grades() {
+        // The grade-3 document is ranked below the grade-1 document.
+        let runs = vec![
+            trec_run("q1", "a", 2.0, "system"),
+            trec_run("q1", "b", 1.0, "system"),
+        ];
+        let qrels = vec![qrel("q1", "a", 1), qrel("q1", "b", 3)];
+
+        let results =
+            evaluate_trec_system(&runs, &qrels, &["ndcg@10", "ndcg@5"], "system").unwrap();
+
+        // DCG = 1 + 3/log2(3); IDCG = 3 + 1/log2(3) (linear gain, as trec_eval).
+        let log2_3 = 3f64.log2();
+        let expected = (1.0 + 3.0 / log2_3) / (3.0 + 1.0 / log2_3);
+        assert!((results.aggregated["ndcg@10"] - expected).abs() < 1e-9);
+        assert!((results.aggregated["ndcg@5"] - expected).abs() < 1e-9);
+
+        // With binary qrels the value is unchanged from the binary formula.
+        let binary = vec![qrel("q1", "a", 1), qrel("q1", "b", 1)];
+        let results = evaluate_trec_system(&runs, &binary, &["ndcg@10"], "system").unwrap();
+        assert!((results.aggregated["ndcg@10"] - 1.0).abs() < 1e-9);
     }
 
     #[test]
