@@ -18,9 +18,17 @@ fn unique_ranked(ranked: &[(String, f32)]) -> impl Iterator<Item = &(String, f32
 ///
 /// Reference: Jarvelin & Kekalainen (2002)
 pub fn compute_ndcg(ranked: &[(String, f32)], qrels: &HashMap<String, u32>, k: usize) -> f64 {
-    let relevance: Vec<f64> = unique_ranked(ranked)
+    ndcg_for_unique_ids(unique_ranked(ranked).map(|(id, _)| id.as_str()), qrels, k)
+}
+
+pub(super) fn ndcg_for_unique_ids<'a>(
+    ranked: impl Iterator<Item = &'a str>,
+    qrels: &HashMap<String, u32>,
+    k: usize,
+) -> f64 {
+    let relevance: Vec<f64> = ranked
         .take(k)
-        .map(|(doc_id, _)| qrels.get(doc_id).copied().unwrap_or(0) as f64)
+        .map(|doc_id| qrels.get(doc_id).copied().unwrap_or(0) as f64)
         .collect();
 
     let mut ideal_gains: Vec<f64> = qrels

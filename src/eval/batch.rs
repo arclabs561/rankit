@@ -198,19 +198,20 @@ pub fn evaluate_trec_system(
             .map(|(id, _)| id)
             .collect();
 
-        // nDCG uses the grades themselves; the other metrics are binary by
-        // definition and use `relevant` (grade > 0).
-        let ranked_scored: Vec<(String, f32)> = query_runs
-            .iter()
-            .map(|run| (run.doc_id.clone(), run.score))
-            .collect();
+        let ndcg = |k| {
+            crate::eval::graded::ndcg_for_unique_ids(
+                query_runs.iter().map(|run| run.doc_id.as_str()),
+                query_qrels,
+                k,
+            )
+        };
 
         let mut query_metrics = HashMap::new();
 
         for metric_name in metrics {
             let value = match *metric_name {
-                "ndcg@10" => crate::eval::graded::compute_ndcg(&ranked_scored, query_qrels, 10),
-                "ndcg@5" => crate::eval::graded::compute_ndcg(&ranked_scored, query_qrels, 5),
+                "ndcg@10" => ndcg(10),
+                "ndcg@5" => ndcg(5),
                 "precision@10" => precision_at_k(&ranked_ids, &relevant, 10),
                 "precision@5" => precision_at_k(&ranked_ids, &relevant, 5),
                 "precision@1" => precision_at_k(&ranked_ids, &relevant, 1),
