@@ -187,7 +187,8 @@ pub fn evaluate_trec_system(
 
         query_runs.sort_unstable_by(|a, b| {
             b.score
-                .total_cmp(&a.score)
+                .partial_cmp(&a.score)
+                .unwrap_or_else(|| b.score.total_cmp(&a.score))
                 .then_with(|| a.doc_id.cmp(&b.doc_id))
         });
         let ranked_ids: Vec<&String> = query_runs.iter().map(|run| &run.doc_id).collect();
@@ -378,6 +379,21 @@ mod tests {
         assert_eq!(results.query_results.len(), 1);
         assert_eq!(results.query_results[0].query_id, "judged");
         assert_eq!(results.aggregated["precision@1"], 1.0);
+    }
+
+    #[test]
+    fn zero_score_sign_does_not_break_document_id_ties() {
+        let qrels = [qrel("q1", "a", 1)];
+        for a in [0.0, -0.0] {
+            for b in [0.0, -0.0] {
+                let mut runs = [trec_run("q1", "a", a, "sys"), trec_run("q1", "b", b, "sys")];
+                for _ in 0..2 {
+                    let results = evaluate_trec_batch(&runs, &qrels, &["precision@1"]);
+                    assert_eq!(results.aggregated["precision@1"], 1.0, "{runs:?}");
+                    runs.reverse();
+                }
+            }
+        }
     }
 
     #[test]
