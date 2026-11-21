@@ -287,6 +287,15 @@ mod tests {
     }
 
     #[test]
+    fn search_matches_compatibility_forms_and_accents() {
+        let mut p = Pipeline::bm25();
+        p.add(1, "ＣＡＦÉ noir").unwrap();
+        p.add(2, "cafe blanc").unwrap();
+        let hits = p.search_all("cafe ＮＯＩＲ", 10);
+        assert_eq!(hits.iter().map(|hit| hit.doc_id).collect::<Vec<_>>(), [1]);
+    }
+
+    #[test]
     fn conjunctive_search() {
         let mut p = Pipeline::bm25();
         p.add(0, "rust programming language").unwrap();
