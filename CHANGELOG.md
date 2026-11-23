@@ -14,6 +14,12 @@ These entries identify source changes without assigning a package release.
 
 ## [Unreleased]
 
+## 0.2.1
+
+### Fixed
+
+- Batch nDCG preserves graded relevance when evaluating TREC runs.
+
 ### Fixed
 
 - Query-likelihood search assigns a log score of negative infinity when a
