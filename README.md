@@ -51,6 +51,23 @@ let relevance = vec![2.0, 0.0, 1.0];
 let loss = ranknet_loss(&predictions, &relevance);
 ```
 
+## Comparing TREC evaluation results
+
+Rankit averages over queries present in both the selected run and the qrels.
+Equal scores rank by ascending document ID, independent of the input row order.
+The graded evaluator uses linear gain.
+
+For example, suppose a run returns tied documents `a` and `z` for `q1`.
+Only `a` is relevant. The qrels also contain a relevant document for `q2`,
+which the run omits. Rankit's nDCG@5 is **1.0000** because it places `a`
+first and averages over `q1`. The
+[Rankops TREC evaluator](https://docs.rs/rankops/latest/rankops/trec/index.html)
+places `z` first and by default includes the missing `q2` at zero, giving
+**0.3155**. Its served-query-only result is **0.6309**.
+
+When comparing systems, use the same evaluator and record both its tie order
+and the set of queries included in the mean.
+
 ## Feature flags
 
 | Feature    | Default | Description |
